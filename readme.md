@@ -1,4 +1,4 @@
-# UR10e Multi-Arm MoveIt + Gazebo Demo
+# Multi-Arm MoveIt + Gazebo Demo
 
 This repository contains the simulation and planning setup for two UR10e robot arms using MoveIt and Gazebo. It includes:
 - Prefixed URDFs for multiple robot arms
@@ -88,9 +88,23 @@ To plan for multiple arms, interface with your custom planner (`multi_arm_moveit
 To generate individual URDF files with prefixes for each robot:
 
 ```bash
-rosrun xacro xacro ur10e_prefixable.xacro prefix:=robot1_ > robot1.urdf
-rosrun xacro xacro ur10e_prefixable.xacro prefix:=robot2_ > robot2.urdf
+rosrun xacro xacro ur10e_prefixable.xacro > robot1.urdf
+rosrun xacro xacro ur10e_prefixable.xacro > robot2.urdf
 ```
+Then rid the xacro and xml tags within the URDF files and run
+
+```bash
+check_urdf robot1.urdf
+```
+to check for errors.
+
+## MoveIt Configuration
+
+```bash
+roslaunch moveit_setup_assistant setup_assistant.launch
+```
+
+
 
 This ensures that all joint and link names are uniquely namespaced for multi-robot simulation.
 
