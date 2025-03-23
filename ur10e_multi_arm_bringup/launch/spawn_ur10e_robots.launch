@@ -1,0 +1,18 @@
+<launch>
+  <arg name="robot1_urdf" default="$(find ur10e_multi_arm_bringup)/urdf/robot1.urdf"/>
+  <arg name="robot2_urdf" default="$(find ur10e_multi_arm_bringup)/urdf/robot2.urdf"/>
+
+  <group ns="robot1">
+    <param name="robot_description" textfile="$(arg robot1_urdf)" />
+    <node pkg="robot_state_publisher" type="robot_state_publisher" name="rsp" output="screen"/>
+    <node name="spawn_robot1" pkg="gazebo_ros" type="spawn_model"
+          args="-param robot_description -urdf -model robot1 -x 0 -y 0 -z 0.1" />
+  </group>
+
+  <group ns="robot2">
+    <param name="robot_description" textfile="$(arg robot2_urdf)" />
+    <node pkg="robot_state_publisher" type="robot_state_publisher" name="rsp" output="screen"/>
+    <node name="spawn_robot2" pkg="gazebo_ros" type="spawn_model"
+          args="-param robot_description -urdf -model robot2 -x 2 -y 0 -z 0.1" />
+  </group>
+</launch>
