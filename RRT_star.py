@@ -10,14 +10,7 @@ from sensor_msgs.msg import JointState
 
 PI = np.pi
 DOF = 6
-JOINT_LIMITS = np.array([
-    [-2*PI, 2*PI],
-    [-2*PI, 2*PI],
-    [-2*PI, 2*PI],
-    [-2*PI, 2*PI],
-    [-2*PI, 2*PI],
-    [-2*PI, 2*PI]
-])
+JOINT_LIMITS = []  # to be filled dynamically
 
 class Node:
     def __init__(self, config, cost=0.0, parent=None):
@@ -52,11 +45,20 @@ def sample_configuration():
 
 class MoveItValidator:
     def __init__(self, group_name):
+        global JOINT_LIMITS
         roscpp_initialize([])
         rospy.init_node("rrt_star_moveit", anonymous=True)
         self.robot = RobotCommander()
         self.scene = PlanningSceneInterface()
         self.group = MoveGroupCommander(group_name)
+
+        # Get joint limits from MoveIt
+        joint_names = self.group.get_active_joints()
+        JOINT_LIMITS = []
+        for name in joint_names:
+            joint = self.robot.get_joint(name)
+            bounds = joint.bounds()
+            JOINT_LIMITS.append((bounds[0], bounds[1]))
 
     def is_valid(self, config):
         self.group.set_joint_value_target(config)
