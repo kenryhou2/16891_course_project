@@ -1,12 +1,11 @@
-# moveit_rrt_star_ur10e.py
+# moveit_rrt_star_ur10e_node.py
 import rospy
 import random
 import numpy as np
 from moveit_commander import RobotCommander, PlanningSceneInterface, MoveGroupCommander, roscpp_initialize
-
-from trajectory_msgs.msg import JointTrajectoryPoint
-from std_msgs.msg import String
+from std_msgs.msg import Bool
 from sensor_msgs.msg import JointState
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 PI = np.pi
 DOF = 6
@@ -47,7 +46,7 @@ class MoveItValidator:
     def __init__(self, group_name):
         global JOINT_LIMITS
         roscpp_initialize([])
-        rospy.init_node("rrt_star_moveit", anonymous=True)
+        rospy.loginfo("Initializing MoveIt for group: %s", group_name)
         self.robot = RobotCommander()
         self.scene = PlanningSceneInterface()
         self.group = MoveGroupCommander(group_name)
@@ -99,18 +98,26 @@ def rrt_star_moveit(start_q, goal_q, validator, num_samples=1000, step_size=0.3,
             return backtrack_path(goal_node)
     return None
 
-if __name__ == '__main__':
-    group_name = "manipulator"  # or "robot1", "robot2", depending on your setup
+def run_rrt_star_node():
+    rospy.init_node("rrt_star_planner_node")
+    group_name = rospy.get_param("~group", "robot1/manipulator")
     validator = MoveItValidator(group_name)
 
     start_config = np.zeros(DOF)
     goal_config = np.array([PI/2, -PI/4, PI/3, -PI/6, PI/4, -PI/3])
 
+    rospy.loginfo("Planning RRT* from %s to %s", start_config, goal_config)
     path = rrt_star_moveit(start_config, goal_config, validator)
 
     if path:
-        print("Path found with %d waypoints." % len(path))
+        rospy.loginfo("Path found with %d waypoints.", len(path))
         for q in path:
-            print(np.round(q, 3))
+            rospy.loginfo(np.round(q, 3))
     else:
-        print("No valid path found.")
+        rospy.logwarn("No valid path found.")
+
+if __name__ == '__main__':
+    try:
+        run_rrt_star_node()
+    except rospy.ROSInterruptException:
+        pass
