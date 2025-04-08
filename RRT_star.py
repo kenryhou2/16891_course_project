@@ -1,9 +1,8 @@
-# moveit_rrt_star_ur10e_node.py
+# moveit_rrt_star_ur10e_node.py (Modularized for CBS)
 import rospy
 import random
 import numpy as np
 from moveit_commander import RobotCommander, PlanningSceneInterface, MoveGroupCommander, roscpp_initialize
-from std_msgs.msg import Bool
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
@@ -98,16 +97,18 @@ def rrt_star_moveit(start_q, goal_q, validator, num_samples=1000, step_size=0.3,
             return backtrack_path(goal_node)
     return None
 
-def run_rrt_star_node():
+def plan_rrt_star(group_name, start_config, goal_config):
+    validator = MoveItValidator(group_name)
+    return rrt_star_moveit(start_config, goal_config, validator)
+
+# Optional: standalone test
+if __name__ == '__main__':
     rospy.init_node("rrt_star_planner_node")
     group_name = rospy.get_param("~group", "robot1/manipulator")
-    validator = MoveItValidator(group_name)
-
     start_config = np.zeros(DOF)
     goal_config = np.array([PI/2, -PI/4, PI/3, -PI/6, PI/4, -PI/3])
 
-    rospy.loginfo("Planning RRT* from %s to %s", start_config, goal_config)
-    path = rrt_star_moveit(start_config, goal_config, validator)
+    path = plan_rrt_star(group_name, start_config, goal_config)
 
     if path:
         rospy.loginfo("Path found with %d waypoints.", len(path))
@@ -115,9 +116,3 @@ def run_rrt_star_node():
             rospy.loginfo(np.round(q, 3))
     else:
         rospy.logwarn("No valid path found.")
-
-if __name__ == '__main__':
-    try:
-        run_rrt_star_node()
-    except rospy.ROSInterruptException:
-        pass
