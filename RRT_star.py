@@ -1,10 +1,11 @@
-# moveit_rrt_star_ur10e_node.py (Modularized for CBS)
 import rospy
 import random
 import numpy as np
 from moveit_commander import RobotCommander, PlanningSceneInterface, MoveGroupCommander, roscpp_initialize
+from urdfpy import URDF
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+import os
 
 PI = np.pi
 DOF = 6
@@ -41,22 +42,21 @@ def find_near_nodes(tree, q_new, radius):
 def sample_configuration():
     return np.array([random.uniform(*JOINT_LIMITS[i]) for i in range(DOF)])
 
+def load_joint_limits_from_urdf(urdf_path):
+    global JOINT_LIMITS
+    robot = URDF.load(urdf_path)
+    JOINT_LIMITS = []
+    for joint in robot.joints:
+        if joint.limit is not None and joint.joint_type == 'revolute':
+            JOINT_LIMITS.append((joint.limit.lower, joint.limit.upper))
+
 class MoveItValidator:
     def __init__(self, group_name):
-        global JOINT_LIMITS
         roscpp_initialize([])
         rospy.loginfo("Initializing MoveIt for group: %s", group_name)
         self.robot = RobotCommander()
         self.scene = PlanningSceneInterface()
         self.group = MoveGroupCommander(group_name)
-
-        # Get joint limits from MoveIt
-        joint_names = self.group.get_active_joints()
-        JOINT_LIMITS = []
-        for name in joint_names:
-            joint = self.robot.get_joint(name)
-            bounds = joint.bounds()
-            JOINT_LIMITS.append((bounds[0], bounds[1]))
 
     def is_valid(self, config):
         self.group.set_joint_value_target(config)
@@ -97,7 +97,8 @@ def rrt_star_moveit(start_q, goal_q, validator, num_samples=1000, step_size=0.3,
             return backtrack_path(goal_node)
     return None
 
-def plan_rrt_star(group_name, start_config, goal_config):
+def plan_rrt_star(group_name, start_config, goal_config, urdf_path):
+    load_joint_limits_from_urdf(urdf_path)
     validator = MoveItValidator(group_name)
     return rrt_star_moveit(start_config, goal_config, validator)
 
@@ -105,10 +106,11 @@ def plan_rrt_star(group_name, start_config, goal_config):
 if __name__ == '__main__':
     rospy.init_node("rrt_star_planner_node")
     group_name = rospy.get_param("~group", "robot1/manipulator")
+    urdf_path = rospy.get_param("~urdf_path", os.path.expanduser("~/MAPF_CP_ws/src/ur10e_multi_arm_bringup/urdf/robot1.urdf"))
     start_config = np.zeros(DOF)
     goal_config = np.array([PI/2, -PI/4, PI/3, -PI/6, PI/4, -PI/3])
 
-    path = plan_rrt_star(group_name, start_config, goal_config)
+    path = plan_rrt_star(group_name, start_config, goal_config, urdf_path)
 
     if path:
         rospy.loginfo("Path found with %d waypoints.", len(path))
