@@ -2,10 +2,10 @@
   <!-- Always set GUI to false for AWS RoboMaker Simulation
        Use gui:=true on roslaunch command-line to run with a gui.
   -->
+  <!-- GUI and world config -->
   <arg name="gui" default="false"/>
-
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
-    <arg name="world_name" value="$(find aws_robomaker_small_warehouse_world)/worlds/small_warehouse.world"/>
+    <arg name="world_name" value="aws-robomaker-small-warehouse-world/worlds/small_warehouse.world"/>
     <arg name="paused" default="false"/>
     <arg name="use_sim_time" default="true"/>
     <arg name="gui" default="$(arg gui)"/>
@@ -13,4 +13,21 @@
     <arg name="debug" default="false"/>
     <arg name="verbose" default="true"/>
   </include>
+
+  <!-- Spawn UR10e Robot 1 -->
+  <group ns="robot1">
+    <param name="robot_description" textfile="$(find ur10e_multi_arm_bringup)/urdf/robot1.urdf"/>
+    <node name="rsp1" pkg="robot_state_publisher" type="robot_state_publisher" output="screen"/>
+    <node name="spawn_robot1" pkg="gazebo_ros" type="spawn_model"
+          args="-param robot_description -urdf -model robot1 -x 1.0 -y 0.5 -z 0.1"/>
+  </group>
+
+  <!-- Spawn UR10e Robot 2 -->
+  <group ns="robot2">
+    <param name="robot_description" textfile="$(find ur10e_multi_arm_bringup)/urdf/robot2.urdf"/>
+    <node name="rsp2" pkg="robot_state_publisher" type="robot_state_publisher" output="screen"/>
+    <node name="spawn_robot2" pkg="gazebo_ros" type="spawn_model"
+          args="-param robot_description -urdf -model robot2 -x -1.0 -y -0.5 -z 0.1"/>
+  </group>
 </launch>
+
