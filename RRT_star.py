@@ -54,12 +54,59 @@ def IsValidArmConfiguration(config):
     return True
 
 def build_constraint_table(constraints, agent, goal_q):
-    # Add here
-    pass
+    
+    constraint_table = {}
+    inf_constraints = {}
+    goal_constraint = None
+    
+    def add_to_constraint_table(timestep, constraint_config, constraint_type):
+        constraint = {'config': constraint_config, 'type': constraint_type}
 
-def IsConstrained(curr_q, next_q, next_time, constraints):
-    # Add here
-    pass
+        if timestep in constraint_table:
+            constraint_table[timestep].append(constraint)
+        else:
+            constraint_table[timestep] = []
+            constraint_table[timestep].append(constraint)
+
+    def add_to_inf_constraints(timestep, constraint_config, constraint_type):
+        inf_constraints[constraint_config] = {'timestep': timestep, 'type': constraint_type}
+
+    for constraint in constraints:
+        if constraint['agent'] == agent:
+            timestep = constraint['timestep']
+            constraint_config = constraint['config']
+            
+            if 'type' in constraint:
+                constraint_type = constraint['type']
+            else:  # For backwards compatibility
+                num_locs = len(constraint['loc'])
+                constraint_type = 'vertex' if num_locs == 1 else 'edge' if num_locs == 2 else None
+
+            add_to_constraint_table(timestep, constraint_config, constraint_type)
+
+            if constraint_type == 'inf':
+                add_to_inf_constraints(timestep, constraint_config, constraint_type)
+
+            if constraint_type == 'vertex' and constraint_config[0] == goal_q:
+                goal_constraint = timestep if goal_constraint is None or goal_constraint < timestep else goal_constraint
+
+    return constraint_table, inf_constraints, goal_constraint
+
+def IsConstrained(curr_q, next_q, next_time, constraint_table):
+    
+    if next_time in constraint_table:
+        constraints = constraint_table[next_time]  # list of constraints on the agent
+                                                   # at the this timestep
+        for constraint in constraints:
+            if constraint['type'] == 'vertex' and next_q == constraint['config']:
+                # vertex constraint violated
+                return True
+            elif constraint['type'] == 'edge' and \
+                    curr_q == constraint['config'][0] and next_q == constraint['config'][1]:
+                # edge constraint violated
+                return True
+            
+    return False
 
 def extend_KDtree(tree, kdtree_data, q_rand, epsilon, step_size, radius):
     
@@ -113,7 +160,13 @@ def extend_KDtree(tree, kdtree_data, q_rand, epsilon, step_size, radius):
 
     return new_node, tree, kdtree_data
 
-def rrt_star_moveit(start_q, goal_q, agent, constraints):
+def rrt_star(start_q, goal_q, agent, constraints):
+    
+    def is_goal(node):
+        if config_distance(newNode.config, goal_q) < goal_threshold and (goal_constraint is None or node.timestep > goal_constraint):
+            return True
+        return False
+    
     num_samples = 1000
     epsilon = 3
     step_size = 0.3
@@ -122,33 +175,28 @@ def rrt_star_moveit(start_q, goal_q, agent, constraints):
     radius = 0.5
     goal_bias = 0.05
 
+    constraint_table, inf_constraints, goal_constraint = build_constraint_table(constraints, agent, goal_q)
+
     # Initialize the KDTree with the start configuration
     tree = [Node(start_q)]
     kdtree_data = [start_q.copy()]
     goal_node = None
-    
-    constraint_table = build_constraint_table(constraints, agent, goal_q)
 
     for _ in range(num_samples):
         q_rand = goal_q if random.random() < goal_bias else gen_rand_config()
-        
-        if not IsValidArmConfiguration(q_rand):
-            print("Invalid random configuration")
-            continue
-        
-        if IsConstrained(start_q, q_rand, 0, constraint_table):
-            print("Configuration is constrained")
-            continue
 
         newNode, tree, kdtree_data = extend_KDtree(tree, kdtree_data, q_rand, epsilon, step_size, radius)
 
-        if not IsValidArmConfiguration(newNode.config):
-            print("Failed to extend KDTree")
+        if IsConstrained(newNode.parent.config, newNode.config, newNode.timestep, constraint_table): # type: ignore
             continue
+        
+        if newNode.config in inf_constraints:
+            if newNode.parent.timestep + 1 >= inf_constraints[newNode.config]['timestep']: # type: ignore
+                continue
 
-        if config_distance(newNode.config, goal_q) < goal_threshold:
+        if is_goal(newNode):
             goal_node = Node(goal_q, parent=newNode, cost=newNode.cost + float(config_distance(newNode.config, goal_q)), timestep=newNode.timestep + 1)
-            print("Found goal node")
+            print("Goal found")
             break
         
     if goal_node:
@@ -156,21 +204,21 @@ def rrt_star_moveit(start_q, goal_q, agent, constraints):
         
     return None
 
-def plan_rrt_star(group_name, start_config, goal_config):
+def plan_rrt_star(start_config, goal_config, agent, constraints):
     load_joint_limits_from_urdf()
-    return rrt_star_moveit(start_config, goal_config)
+    return rrt_star(start_config, goal_config, agent, constraints)
 
-if __name__ == '__main__':
-    rospy.init_node("rrt_star_planner_node")
-    group_name = rospy.get_param("~group", "robot1/manipulator")
-    start_config = np.zeros(DOF)
-    goal_config = np.array([PI/2, -PI/4, PI/3, -PI/6, PI/4, -PI/3])
+# if __name__ == '__main__':
+#     rospy.init_node("rrt_star_planner_node")
+#     group_name = rospy.get_param("~group", "robot1/manipulator")
+#     start_config = np.zeros(DOF)
+#     goal_config = np.array([PI/2, -PI/4, PI/3, -PI/6, PI/4, -PI/3])
 
-    path = plan_rrt_star(group_name, start_config, goal_config)
+#     path = plan_rrt_star(group_name, start_config, goal_config)
 
-    if path:
-        rospy.loginfo("Path found with %d waypoints.", len(path))
-        for q in path:
-            rospy.loginfo(np.round(q, 3))
-    else:
-        rospy.logwarn("No valid path found.")
+#     if path:
+#         rospy.loginfo("Path found with %d waypoints.", len(path))
+#         for q in path:
+#             rospy.loginfo(np.round(q, 3))
+#     else:
+#         rospy.logwarn("No valid path found.")
