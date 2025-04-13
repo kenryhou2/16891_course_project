@@ -196,7 +196,7 @@ def rrt_star(start_q, goal_q, agent, constraints):
 
         if is_goal(newNode):
             goal_node = Node(goal_q, parent=newNode, cost=newNode.cost + float(config_distance(newNode.config, goal_q)), timestep=newNode.timestep + 1)
-            print("Goal found")
+            print("Goal reached")
             break
         
     if goal_node:
