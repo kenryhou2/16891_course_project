@@ -1,91 +1,173 @@
 #!/usr/bin/python
-import argparse
+import args_parser
 import glob
 from pathlib import Path
 from cbs import CBSSolver
-from pbs import PBSSolver
-from independent import IndependentSolver
-from joint_state import JointStateSolver
-from prioritized import PrioritizedPlanningSolver
-from visualize import Animation
-from single_agent_planner import get_sum_of_cost
+
+# from pbs import PBSSolver
+# from independent import IndependentSolver
+# from joint_state import JointStateSolver
+# from prioritized import PrioritizedPlanningSolver
+
+from visualize import Animation3D
+from utils import get_sum_of_cost
 
 SOLVER = "CBS"
 
 
 def print_mapf_instance(my_map, starts, goals):
-    print('Start locations')
+    print("Start locations")
     print_locations(my_map, starts)
-    print('Goal locations')
+    print("Goal locations")
     print_locations(my_map, goals)
 
 
+def print_3d_map(my_map):
+    """
+    Print a 3D map layer by layer
+    """
+    depth = len(my_map[0][0])
+    height = len(my_map)
+    width = len(my_map[0])
+
+    for z in range(depth):
+        print(f"Layer {z}:")
+        for x in range(height):
+            for y in range(width):
+                if my_map[x][y][z]:
+                    print("@", end=" ")  # Obstacle
+                else:
+                    print(".", end=" ")  # Free space
+            print()
+        print()
+
+
 def print_locations(my_map, locations):
-    starts_map = [[-1 for _ in range(len(my_map[0]))] for _ in range(len(my_map))]
+    """
+    Print agent locations on the map
+    """
+    depth = len(my_map[0][0])
+    height = len(my_map)
+    width = len(my_map[0])
+
+    # Create a 3D grid to mark agent positions
+    locations_map = [[[-1 for _ in range(depth)] for _ in range(width)] for _ in range(height)]
+
     for i in range(len(locations)):
-        starts_map[locations[i][0]][locations[i][1]] = i
-    to_print = ''
-    for x in range(len(my_map)):
-        for y in range(len(my_map[0])):
-            if starts_map[x][y] >= 0:
-                to_print += str(starts_map[x][y]) + ' '
-            elif my_map[x][y]:
-                to_print += '@ '
-            else:
-                to_print += '. '
-        to_print += '\n'
-    print(to_print)
+        x, y, z = locations[i]
+        locations_map[x][y][z] = i
+
+    for z in range(depth):
+        print(f"Layer {z}:")
+        for x in range(height):
+            for y in range(width):
+                if locations_map[x][y][z] >= 0:
+                    print(str(locations_map[x][y][z]), end=" ")
+                elif my_map[x][y][z]:
+                    print("@", end=" ")
+                else:
+                    print(".", end=" ")
+            print()
+        print()
+
+
+# def import_mapf_instance(filename):
+#     f = Path(filename)
+#     if not f.is_file():
+#         raise BaseException(filename + " does not exist.")
+#     f = open(filename, "r")
+#     # first line: #rows #columns
+#     line = f.readline()
+#     rows, columns = [int(x) for x in line.split(" ")]
+#     rows = int(rows)
+#     columns = int(columns)
+#     # #rows lines with the map
+#     my_map = []
+#     for r in range(rows):
+#         line = f.readline()
+#         my_map.append([])
+#         for cell in line:
+#             if cell == "@":
+#                 my_map[-1].append(True)
+#             elif cell == ".":
+#                 my_map[-1].append(False)
+#     # #agents
+#     line = f.readline()
+#     num_agents = int(line)
+#     # #agents lines with the start/goal positions
+#     starts = []
+#     goals = []
+#     for a in range(num_agents):
+#         line = f.readline()
+#         sx, sy, gx, gy = [int(x) for x in line.split(" ")]
+#         starts.append((sx, sy))
+#         goals.append((gx, gy))
+#     f.close()
+#     return my_map, starts, goals
 
 
 def import_mapf_instance(filename):
+    """
+    Import a 3D MAPF instance from a file
+
+    File format:
+    num_rows num_cols num_layers
+    Layer 0 represented as a grid of . and @ characters
+    ...
+    Layer n-1 represented as a grid of . and @ characters
+    num_agents
+    sx sy sz gx gy gz (for each agent)
+    """
     f = Path(filename)
     if not f.is_file():
         raise BaseException(filename + " does not exist.")
-    f = open(filename, 'r')
-    # first line: #rows #columns
-    line = f.readline()
-    rows, columns = [int(x) for x in line.split(' ')]
-    rows = int(rows)
-    columns = int(columns)
-    # #rows lines with the map
-    my_map = []
-    for r in range(rows):
-        line = f.readline()
-        my_map.append([])
-        for cell in line:
-            if cell == '@':
-                my_map[-1].append(True)
-            elif cell == '.':
-                my_map[-1].append(False)
-    # #agents
-    line = f.readline()
-    num_agents = int(line)
-    # #agents lines with the start/goal positions
-    starts = []
-    goals = []
-    for a in range(num_agents):
-        line = f.readline()
-        sx, sy, gx, gy = [int(x) for x in line.split(' ')]
-        starts.append((sx, sy))
-        goals.append((gx, gy))
-    f.close()
+
+    with open(filename, "r") as f:
+        # First line: #rows #columns #layers
+        line = f.readline().strip()
+        rows, columns, layers = [int(x) for x in line.split()]
+
+        # Initialize 3D map
+        my_map = [[[False for _ in range(layers)] for _ in range(columns)] for _ in range(rows)]
+
+        # Read each layer
+        for z in range(layers):
+            for x in range(rows):
+                line = f.readline().strip()
+                for y, cell in enumerate(line):
+                    if cell == "@":
+                        my_map[x][y][z] = True  # Obstacle
+                    elif cell == ".":
+                        my_map[x][y][z] = False  # Free space
+
+            # Skip any blank lines or comments between layers
+            next_line = f.readline().strip()
+            while next_line.startswith("#") or not next_line:
+                next_line = f.readline().strip()
+
+            # Push back the last read line if it's not a comment or blank
+            if not next_line.startswith("#") and next_line:
+                f.seek(f.tell() - len(next_line) - 1)
+
+        # Number of agents
+        line = f.readline().strip()
+        num_agents = int(line)
+
+        # Agent start/goal positions
+        starts = []
+        goals = []
+        for _ in range(num_agents):
+            line = f.readline().strip()
+            sx, sy, sz, gx, gy, gz = [int(x) for x in line.split()]
+            starts.append((sx, sy, sz))
+            goals.append((gx, gy, gz))
+
     return my_map, starts, goals
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Runs various MAPF algorithms')
-    parser.add_argument('--instance', type=str, default=None,
-                        help='The name of the instance file(s)')
-    parser.add_argument('--batch', action='store_true', default=False,
-                        
-                        help='Use batch output instead of animation')
-    parser.add_argument('--solver', type=str, default=SOLVER,
-                        help='The solver to use (one of: {CBS,PBS,Independent,Prioritized}), defaults to ' + str(
-                            SOLVER))
-
+if __name__ == "__main__":
+    parser = args_parser.create_parser()
     args = parser.parse_args()
-
-    result_file = open("results.csv", "w", buffering=1)
 
     for file in sorted(glob.glob(args.instance)):
 
@@ -97,31 +179,11 @@ if __name__ == '__main__':
             print("***Run CBS***")
             cbs = CBSSolver(my_map, starts, goals)
             paths = cbs.find_solution()
-        elif args.solver == "PBS":
-            print("***Run PBS***")
-            solver = PBSSolver(my_map, starts, goals)
-            paths = solver.find_solution()
-        elif args.solver == "Independent":
-            print("***Run Independent***")
-            solver = IndependentSolver(my_map, starts, goals)
-            paths = solver.find_solution()
-        elif args.solver == "JointState":
-            print("***Run JointState***")
-            solver = JointStateSolver(my_map, starts, goals)
-            paths = solver.find_solution()
-        elif args.solver == "Prioritized":
-            print("***Run Prioritized***")
-            solver = PrioritizedPlanningSolver(my_map, starts, goals)
-            paths = solver.find_solution()
         else:
             raise RuntimeError("Unknown solver!")
 
-        cost = get_sum_of_cost(paths)
-        result_file.write("{},{}\n".format(file, cost))
-
         if not args.batch:
             print("***Test paths on a simulation***")
-            animation = Animation(my_map, starts, goals, paths)
-            # animation.save("output.mp4", 1.0)
+            animation = Animation3D(my_map, starts, goals, paths)
+            animation.save("output.mp4", 1.0)
             animation.show()
-    result_file.close()
