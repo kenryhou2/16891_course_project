@@ -1,0 +1,6 @@
+robot2_manipulator_controller:
+  type: effort_controllers/JointTrajectoryController
+  joints:
+    []
+  gains:
+    {}

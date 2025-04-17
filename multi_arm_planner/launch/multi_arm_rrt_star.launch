@@ -1,0 +1,36 @@
+<launch>
+  <!-- ========== Robot 1 ========== -->
+  <group ns="robot1">
+    <!-- 1. Launch MoveIt for robot1 -->
+    <include file="$(find robot1_moveit_config)/launch/demo.launch"/>
+    
+    <!-- 2. Start RRT* planner node for robot1 -->
+    <node pkg="multi_arm_planner"
+          type="rrt_star_node.py"
+          name="rrt_star_node"
+          output="screen">
+      <!-- these params feed into RRTStarPlannerNode.__init__ -->
+      <param name="arm_name"   value="robot1"/>
+      <param name="group_name" value="robot1/manipulator"/>
+      <param name="dof"        value="6"/>
+      <param name="agent_id"   value="0"/>
+    </node>
+  </group>
+
+  <!-- ========== Robot 2 ========== -->
+  <group ns="robot2">
+    <!-- 1. Launch MoveIt for robot2 -->
+    <include file="$(find robot2_moveit_config)/launch/demo.launch"/>
+    
+    <!-- 2. Start RRT* planner node for robot2 -->
+    <node pkg="multi_arm_planner"
+          type="rrt_star_node.py"
+          name="rrt_star_node"
+          output="screen">
+      <param name="arm_name"   value="robot2"/>
+      <param name="group_name" value="robot2/manipulator"/>
+      <param name="dof"        value="6"/>
+      <param name="agent_id"   value="1"/>
+    </node>
+  </group>
+</launch>
