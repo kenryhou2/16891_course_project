@@ -8,6 +8,9 @@ from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 import os
 import math
+from moveit_msgs.msg import RobotState
+from moveit_commander.conversions import pose_to_list
+from moveit_msgs.srv import GetStateValidity, GetStateValidityRequest
 
 PI = math.pi
 DOF = 6
@@ -50,8 +53,27 @@ def load_joint_limits_from_urdf():
             JOINT_LIMITS.append((joint.limit.lower, joint.limit.upper))
 
 def IsValidArmConfiguration(config):
-    # Add here
-    return True
+    
+    # Check if the configuration is within joint limits
+    group.set_joint_value_target(config.tolist())
+    state = group.get_current_state()
+    state.joint_state.position = config.tolist()
+
+    # You need to set this state to a RobotState message
+    robot_state = RobotState()
+    robot_state.joint_state.name = group.get_active_joints()
+    robot_state.joint_state.position = config.tolist()
+
+    # Call the planning scene's collision check service
+    # Note: only works for static collision checking, if moving in dynamic env, requery planning scene
+    rospy.wait_for_service('/check_state_validity')
+    gsv = rospy.ServiceProxy('/check_state_validity', GetStateValidity)
+    req = GetStateValidityRequest()
+    req.robot_state = robot_state
+    req.group_name = group.get_name()
+
+    result = gsv(req)
+    return result.valid
 
 def build_constraint_table(constraints, agent, goal_q):
     
