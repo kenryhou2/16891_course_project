@@ -1,36 +1,35 @@
 <launch>
-  <!-- ========== Robot 1 ========== -->
+  <!-- ========== Robot 1 MoveIt + Planner ========= -->
   <group ns="robot1">
-    <!-- 1. Launch MoveIt for robot1 -->
+    <!-- bring up the MoveIt demo (robot1_moveit_config/demo.launch) -->
     <include file="$(find robot1_moveit_config)/launch/demo.launch"/>
-    
-    <!-- 2. Start RRT* planner node for robot1 -->
+
+    <!-- then start your RRT* node under /robot1 -->
     <node pkg="multi_arm_planner"
           type="rrt_star_node.py"
           name="rrt_star_node"
           output="screen">
-      <!-- these params feed into RRTStarPlannerNode.__init__ -->
       <param name="arm_name"   value="robot1"/>
-      <param name="group_name" value="robot1/manipulator"/>
+      <param name="group_name" value="robot1_manipulator"/>
       <param name="dof"        value="6"/>
-      <param name="agent_id"   value="0"/>
+      <param name="agent_id"   value="1"/>
     </node>
   </group>
 
-  <!-- ========== Robot 2 ========== -->
+  <!-- ========== Robot 2 MoveIt + Planner ========= -->
   <group ns="robot2">
-    <!-- 1. Launch MoveIt for robot2 -->
-    <include file="$(find robot2_moveit_config)/launch/demo.launch"/>
-    
-    <!-- 2. Start RRT* planner node for robot2 -->
+    <!-- if you only have robot1_moveit_config, you can include it again.
+         both arms will share the same MoveIt server, but live under /robot2 -->
+    <include file="$(find robot1_moveit_config)/launch/demo.launch"/>
+
     <node pkg="multi_arm_planner"
           type="rrt_star_node.py"
           name="rrt_star_node"
           output="screen">
       <param name="arm_name"   value="robot2"/>
-      <param name="group_name" value="robot2/manipulator"/>
+      <param name="group_name" value="robot1_manipulator"/>  <!-- note this must match your SRDF group -->
       <param name="dof"        value="6"/>
-      <param name="agent_id"   value="1"/>
+      <param name="agent_id"   value="2"/>
     </node>
   </group>
 </launch>

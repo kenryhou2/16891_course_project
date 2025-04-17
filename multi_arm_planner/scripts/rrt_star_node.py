@@ -1,4 +1,16 @@
 #!/usr/bin/env python
+#!/usr/bin/env python
+import sys, os
+import rospkg
+
+# Find the path to our package
+rospack = rospkg.RosPack()
+pkg_path = rospack.get_path('multi_arm_planner')
+
+# Add its "scripts/" directory to Python's module search path
+scripts_path = os.path.join(pkg_path, 'scripts')
+if scripts_path not in sys.path:
+    sys.path.insert(0, scripts_path)
 
 import rospy
 import numpy as np
@@ -14,15 +26,21 @@ class RRTStarPlannerNode:
 
         # Load parameters
         self.arm_name = rospy.get_param("~arm_name", "robot1")
-        self.group_name = rospy.get_param("~group_name", "robot1/manipulator")
+        self.group_name = rospy.get_param("~group_name", "robot1_manipulator")
         self.dof = rospy.get_param("~dof", 6)
         self.agent_id = rospy.get_param("~agent_id", 0)
         self.constraints = []  # could subscribe to constraints topic if needed
+        rospy.loginfo(f"[{self.arm_name}] Using planning group: '{self.group_name}'")
 
         # Init MoveIt
         moveit_commander.roscpp_initialize(sys.argv)
-        self.group = moveit_commander.MoveGroupCommander(self.group_name)
 
+        # BEFORE we construct the MoveGroupCommander, let's query which groups are available:
+        available = self._get_available_groups()
+        rospy.loginfo(f"[{self.arm_name}] MoveIt reports available groups: {available}")
+
+        self.group = moveit_commander.MoveGroupCommander(self.group_name)
+        rospy.loginfo(f"[{self.arm_name}] Successfully connected to group '{self.group_name}'")
         # Inject into RRT_star global scope if needed
         import RRT_star
         RRT_star.group = self.group
@@ -36,6 +54,25 @@ class RRTStarPlannerNode:
         self.goal_config = None
 
         rospy.loginfo(f"[{self.arm_name}] RRT* planner initialized.")
+
+    def _get_available_groups(self):
+        """
+        Calls the MoveGroup service to list all planning groups in this namespace.
+        """
+        from moveit_msgs.srv import GetPlanningScene, GetPlanningSceneRequest
+        import rosservice
+        # A simpler way is to call the ROS service directly:
+        try:
+            groups = self.group.get_group_names()
+            return groups
+        except Exception:
+            # fallback: call the rosservice manually
+            try:
+                resp = rosservice.call_service(
+                    f"/{self.arm_name}/move_group/get_planning_groups", "{}")
+                return resp.group_names
+            except Exception as e:
+                return f"<error listing groups: {e}>"
 
     def start_callback(self, msg):
         if len(msg.position) >= self.dof:

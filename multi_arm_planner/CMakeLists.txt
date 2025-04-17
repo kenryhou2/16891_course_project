@@ -110,6 +110,13 @@ catkin_package(
 #  LIBRARIES multi_arm_planner
 #  CATKIN_DEPENDS moveit_commander moveit_msgs rospy sensor_msgs std_msgs trajectory_msgs
 #  DEPENDS system_lib
+  CATKIN_DEPENDS
+    moveit_commander
+    moveit_msgs
+    rospy
+    sensor_msgs
+    std_msgs
+    trajectory_msgs
 )
 
 ###########
@@ -162,10 +169,11 @@ include_directories(
 
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
-# catkin_install_python(PROGRAMS
-#   scripts/my_python_script
-#   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-# )
+catkin_install_python(PROGRAMS
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+  scripts/rrt_star_node.py
+  scripts/rrt_2_arm_test.sh
+)
 
 ## Mark executables for installation
 ## See http://docs.ros.org/melodic/api/catkin/html/howto/format1/building_executables.html
@@ -187,6 +195,10 @@ include_directories(
 #   FILES_MATCHING PATTERN "*.h"
 #   PATTERN ".svn" EXCLUDE
 # )
+## Install launch files
+install(DIRECTORY launch/
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
+)
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
 # install(FILES

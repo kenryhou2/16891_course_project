@@ -3,7 +3,8 @@ import rospy
 import random
 import numpy as np
 from scipy.spatial import KDTree
-from urdfpy import URDF
+# from urdfpy import URDF
+from urdf_parser_py.urdf import URDF
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 import os
@@ -46,7 +47,8 @@ def gen_rand_config():
 
 def load_joint_limits_from_urdf():
     global JOINT_LIMITS
-    robot = URDF.load(FIXED_URDF_PATH)
+    # robot = URDF.load(FIXED_URDF_PATH)
+    robot = URDF.from_parameter_server()
     JOINT_LIMITS = []
     for joint in robot.joints:
         if joint.limit is not None and joint.joint_type == 'revolute':
@@ -141,7 +143,10 @@ def extend_KDtree(tree, kdtree_data, q_rand, epsilon, step_size, radius):
     q_new = []
     q_prev = nearest_node.config.copy()
     
-    for step in range(step_size, epsilon + 1, step_size):
+    # for step in range(step_size, epsilon + 1, step_size):
+    num_steps = int(math.ceil(epsilon / step_size))
+    for i in range(1, num_steps + 1):
+        step = i * step_size
         q_new = interpolate_config(nearest_node.config, q_rand, step)
         
         if not IsValidArmConfiguration(q_new):
@@ -230,17 +235,17 @@ def plan_rrt_star(start_config, goal_config, agent, constraints):
     load_joint_limits_from_urdf()
     return rrt_star(start_config, goal_config, agent, constraints)
 
-# if __name__ == '__main__':
-#     rospy.init_node("rrt_star_planner_node")
-#     group_name = rospy.get_param("~group", "robot1/manipulator")
-#     start_config = np.zeros(DOF)
-#     goal_config = np.array([PI/2, -PI/4, PI/3, -PI/6, PI/4, -PI/3])
+if __name__ == '__main__':
+    rospy.init_node("rrt_star_planner_node")
+    group_name = rospy.get_param("~group", "robot1/manipulator")
+    start_config = np.zeros(DOF)
+    goal_config = np.array([PI/2, -PI/4, PI/3, -PI/6, PI/4, -PI/3])
 
-#     path = plan_rrt_star(group_name, start_config, goal_config)
+    path = plan_rrt_star(group_name, start_config, goal_config)
 
-#     if path:
-#         rospy.loginfo("Path found with %d waypoints.", len(path))
-#         for q in path:
-#             rospy.loginfo(np.round(q, 3))
-#     else:
-#         rospy.logwarn("No valid path found.")
+    if path:
+        rospy.loginfo("Path found with %d waypoints.", len(path))
+        for q in path:
+            rospy.loginfo(np.round(q, 3))
+    else:
+        rospy.logwarn("No valid path found.")
