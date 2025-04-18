@@ -1,7 +1,0 @@
-<launch>
-  <!-- Start Gazebo -->
-  <include file="$(find ur10e_multi_arm_bringup)/launch/gazebo.launch"/>
-
-  <!-- Spawn both UR10e arms -->
-  <include file="$(find ur10e_multi_arm_bringup)/launch/spawn_ur10e_robots.launch"/>
-</launch>
