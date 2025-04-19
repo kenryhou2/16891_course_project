@@ -47,10 +47,11 @@ class RRTPlanner(PathPlanner):
 
     def __init__(
         self,
-        robot_model: RobotModel = None,
-        max_nodes: int = 10000,
+        robot_model: Optional[RobotModel] = None,
+        max_nodes: int = 100000,
         goal_bias: float = 0.2,
-        step_size: float = 0.2,
+        step_size: float = 0.1,
+        epsilon: float = 3.0,
         joint_limits: Optional[List[Tuple[float, float]]] = None,
     ):
         """
@@ -67,6 +68,7 @@ class RRTPlanner(PathPlanner):
         self.max_nodes = max_nodes
         self.goal_bias = goal_bias
         self.step_size = step_size
+        self.epsilon = epsilon
 
         # Joint limits can be provided or extracted from the robot model
         if joint_limits is None:
@@ -109,34 +111,44 @@ class RRTPlanner(PathPlanner):
                 min_dist = dist
                 nearest_node = node
 
+        if nearest_node is None:
+            raise ValueError("No nearest node found. The nodes dictionary might be empty.")
         return nearest_node
 
     def euclidean_distance(self, config1: List[float], config2: List[float]) -> float:
         """
         Calculate Euclidean distance between two configurations.
         """
-        return np.sqrt(sum((c1 - c2) ** 2 for c1, c2 in zip(config1, config2)))
-
-    def new_config(self, from_config: List[float], to_config: List[float]) -> List[float]:
+        if config1 is None or config2 is None:
+            raise ValueError("Input configurations cannot be None.")
+        return float(np.linalg.norm(np.array(config1) - np.array(config2)))
+    
+    def new_config(self, from_config: List[float], to_config: List[float], obstacles: Optional[List[Obstacle]]) -> List[float]:
         """
-        Return a new configuration that is step_size away from from_config
+        Return a new configuration that is at max epsilon away from from_config
         in the direction of to_config.
         """
-        distance = self.euclidean_distance(from_config, to_config)
+        
+        new_config = from_config.copy()
+        prev_config = from_config.copy()
+        
+        for i in np.arange(self.step_size, self.epsilon, self.step_size):
+            new_config = list(np.array(from_config) + (np.array(to_config) - np.array(from_config)) * (i / self.euclidean_distance(from_config, to_config)))
 
-        if distance <= self.step_size:
-            return to_config
-
-        # Calculate direction vector and normalize
-        direction = [(to - from_val) / distance for to, from_val in zip(to_config, from_config)]
-
-        # Create new configuration
-        new_config = [from_val + dir_val * self.step_size for from_val, dir_val in zip(from_config, direction)]
-
-        # Ensure new configuration is within joint limits
-        for i, (lower, upper) in enumerate(self.joint_limits):
-            new_config[i] = max(lower, min(upper, new_config[i]))
-
+            # Ensure new configuration is within joint limits
+            for i, (lower, upper) in enumerate(self.joint_limits):
+                new_config[i] = max(lower, min(upper, new_config[i]))
+                
+            if not self.is_valid_config(new_config, obstacles):
+                new_config = prev_config.copy()
+                break
+            else:
+                prev_config = new_config.copy() 
+            
+            if self.euclidean_distance(new_config, to_config) < self.step_size:
+                new_config = to_config.copy()    
+                break
+            
         return new_config
 
     def is_valid_config(self, config: List[float], obstacles: Optional[List[Obstacle]] = None) -> bool:
@@ -150,7 +162,12 @@ class RRTPlanner(PathPlanner):
         Returns:
             True if configuration is valid, False otherwise
         """
-        logger.debug(f"Checking for collisions with {len(obstacles)} obstacles: {obstacles}")
+
+        # Temprarily set the robot's joint states to the given configuration
+        for idx, joint_index in enumerate(self.robot_model.movable_joints):
+            pybullet.resetJointState(self.robot_model.robot_id, joint_index, config[idx])
+        
+        logger.debug(f"Checking for collisions with {len(obstacles) if obstacles else 0} obstacles")
 
         # Check if configuration is within joint limits
         for i, (lower, upper) in enumerate(self.joint_limits):
@@ -229,9 +246,9 @@ class RRTPlanner(PathPlanner):
         start_config: List[float],
         goal_config: List[float],
         obstacles: Optional[List[Obstacle]] = None,
-        plane=None,
         timeout: float = 3000.0,
-        constraints: List[Constraint] = None,
+        constraints: Optional[List[Constraint]] = None,
+        plane: int = 0,
     ) -> Optional[List[List[float]]]:
         """
         Plan a path from start_config to goal_config using RRT.
@@ -277,7 +294,7 @@ class RRTPlanner(PathPlanner):
             nearest_node = self.nearest_neighbor(nodes, random_config)
 
             # Generate new configuration
-            new_config = self.new_config(nearest_node["config"], random_config)
+            new_config = self.new_config(nearest_node["config"], random_config, obstacles=obstacles)
 
             # Check if new configuration is valid
             if not self.is_valid_config(config=new_config, obstacles=obstacles):

@@ -8,7 +8,7 @@ from utils import setup_rrt_with_obstacles
 from ur5e import UR5eRobot
 from environment import SimulationEnvironment
 from simulator import Simulator
-from visualization import DataVisualizer, visualize_ee_path
+from visualization import DataVisualizer
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -73,7 +73,7 @@ def execute_path(robot, path, env, duration=20.0, simulator=None):
     logger.debug(f"Path: {path}")
 
     end_effector_time = 3.0
-    visualize_ee_path(robot, path, env, duration=end_effector_time, line_width=10)
+    DataVisualizer.visualize_ee_path(robot, path, env, duration=end_effector_time, line_width=10)
 
     history = simulator.run(duration=duration - end_effector_time, dt=1 / 240)
     DataVisualizer.plot_joint_trajectories(history, "UR5e Robot Joint Trajectories")

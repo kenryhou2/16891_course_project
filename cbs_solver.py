@@ -288,7 +288,7 @@ class CBSSolver:
                 return None
 
             # Plan the initial path for each robot
-            path = planner.plan(start_config, goal_config, self.obstacles, self.plane, timeout=self.timeout)
+            path = planner.plan(start_config, goal_config, self.obstacles, plane=self.plane if self.plane is not None else 0, timeout=self.timeout)
 
             if path is None:
                 logger.error(f"Failed to find initial path for robot {agent_id}")
