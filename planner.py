@@ -154,6 +154,8 @@ class RRTPlanner(PathPlanner):
     def is_valid_config(self, config: List[float], obstacles: Optional[List[Obstacle]] = None) -> bool:
         """
         Check if a configuration is valid (within joint limits and collision-free).
+        Check for self-collisions and collisions with obstacles.
+        This method temporarily sets the robot's joint states to the given configuration.
 
         Args:
             config: Configuration to check
@@ -191,7 +193,7 @@ class RRTPlanner(PathPlanner):
         for joint_index in range(pybullet.getNumJoints(self.robot_model.robot_id)):
             touch_ground = pybullet.getClosestPoints(self.robot_model.robot_id, self.plane_idx, GROUND_Z_THRESHOLD, linkIndexA=joint_index)
             if touch_ground and joint_index != 0:
-                logger.info(f"Robot {self.robot_model.robot_id} Joint {joint_index} is touching the ground")
+                logger.debug(f"Robot {self.robot_model.robot_id} Joint {joint_index} is touching the ground")
                 return False
 
         # This would need to use forward kinematics to check for collisions with the environment
@@ -199,7 +201,7 @@ class RRTPlanner(PathPlanner):
             collision_risk_distance = 0.001
             for obstacle in obstacles:
                 if obstacle.check_config_collision(self.robot_model, config, threshold=collision_risk_distance):
-                    logger.info(f"Collision detected Robot {self.robot_model.robot_id} with obstacle {obstacle.body_id} with {self.node_count} nodes")
+                    # logger.info(f"Collision detected Robot {self.robot_model.robot_id} with obstacle {obstacle.body_id} with {self.node_count} nodes")
                     return False
 
         return True
@@ -300,9 +302,9 @@ class RRTPlanner(PathPlanner):
             if not self.is_valid_config(config=new_config, obstacles=obstacles):
                 continue
 
-            # Check if movement to new configuration is valid
-            if not self.is_valid_movement(from_config=nearest_node["config"], to_config=new_config, obstacles=obstacles):
-                continue
+            # # Check if movement to new configuration is valid
+            # if not self.is_valid_movement(from_config=nearest_node["config"], to_config=new_config, obstacles=obstacles):
+            #     continue
 
             new_timestep = nearest_node["timestep"] + 1
             if self.constraints and self.is_constrained(nearest_node["config"], new_config, new_timestep):

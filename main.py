@@ -56,10 +56,12 @@ def run_multiple_ur5e_scenario():
     start_configs = {}
     goal_configs = {}
     start_configs[robot1.robot_id] = [0, 0, 0, 0, 0, 0]
-    start_configs[robot2.robot_id] = [0, 0, 0, 0, 0, 0]
-    start_configs[robot3.robot_id] = [0, 0, 0, 0, 0, 0]
     goal_configs[robot1.robot_id] = [np.pi / 2, -np.pi / 3, np.pi / 6, -np.pi / 2, np.pi / 4, 0]
+    
+    start_configs[robot2.robot_id] = [0, 0, 0, 0, 0, 0]
     goal_configs[robot2.robot_id] = [np.pi / 2, -np.pi / 3, np.pi / 6, -np.pi / 2, np.pi / 4, 0]
+    
+    start_configs[robot3.robot_id] = [0, 0, 0, 0, 0, 0]
     goal_configs[robot3.robot_id] = [np.pi / 4, -np.pi / 6, np.pi / 2, -np.pi / 2, np.pi / 4, 0]
 
     planners = {}
