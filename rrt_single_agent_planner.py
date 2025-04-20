@@ -4,10 +4,11 @@ import random
 from utils import is_constrained, is_goal_valid, is_valid_location, build_constraint_table, euclidean_distance
 
 
-MAX_NODES = 10000  # Maximum number of nodes in the RRT tree
+MAX_NODES = 100000  # Maximum number of nodes in the RRT tree
 GOAL_BIAS = 0.2  # Probability of sampling the goal location
-STEP_SIZE = 0.5  # Distance to extend the tree in each step
-EPSILON = 3.0  # Maximum distance to consider a node as a neighbor
+STEP_SIZE = 0.05  # Distance to extend the tree in each step
+EPSILON = 1.0  # Maximum distance to consider a node as a neighbor
+REWIRE_RADIUS = 1.0  # Radius for rewiring nearby nodes
 
 
 def sample_random_location(my_map, goal_loc):
@@ -63,13 +64,17 @@ def new_location(from_loc, to_loc, my_map):
 
     direction = to_loc - from_loc
     distance = np.linalg.norm(direction)
+    
+    if distance < 1e-6:
+        # Already at the target location
+        return tuple(np.round(to_loc).astype(int))
 
     step = STEP_SIZE
     
     for _ in np.arange(step, EPSILON + 1, step):
         new_loc = from_loc + step * (direction / distance)
         
-        if not is_valid_location(tuple(np.round(new_loc).astype(int)), my_map) and not is_movement_valid(tuple(np.round(new_loc).astype(int)), tuple(np.round(prev_loc).astype(int))):
+        if not is_valid_location(tuple(np.round(new_loc).astype(int)), my_map):
             new_loc = prev_loc.copy()
             break
         else:
@@ -81,36 +86,40 @@ def new_location(from_loc, to_loc, my_map):
         
     return tuple(np.round(new_loc).astype(int))
 
-
 def is_movement_valid(from_loc: tuple, to_loc: tuple) -> bool:
     """
     Check if the movement from from_loc to to_loc is valid
     """
-    # Check if the movement is valid in the x, y, and z directions
-    dx = abs(from_loc[0] - to_loc[0])
-    dy = abs(from_loc[1] - to_loc[1])
-    dz = abs(from_loc[2] - to_loc[2])
+    """
+    Check if the movement from from_loc to to_loc is valid (single axis move or stay).
+    """
+    dx, dy, dz = np.abs(np.array(from_loc) - np.array(to_loc))
+    return (dx + dy + dz) <= 1
 
-    # Do not allow diagonal movement in 3D space
-    return (dx + dy + dz <= 1) or (dx == 0 and dy == 0 and dz == 0)
-
-def IsValidInterpolation(from_loc: tuple, to_loc: tuple, my_map: list) -> bool:
+def IsValidInterpolation(from_loc, to_loc, my_map) -> bool:
     
     from_loc = np.array(from_loc, dtype=np.float32)
     to_loc = np.array(to_loc, dtype=np.float32)
-    
-    dist = np.linalg.norm(to_loc - from_loc)
-    step = STEP_SIZE
-    
-    for _ in np.arange(step, dist + 1, step):
-        loc = from_loc + step * ((to_loc - from_loc) / dist)
-        
-        if not is_valid_location(tuple(np.round(loc).astype(int)), my_map) and not is_movement_valid(tuple(np.round(loc).astype(int)), tuple(np.round(from_loc).astype(int))):
+
+    direction = to_loc - from_loc
+    distance = np.linalg.norm(direction)
+
+    if distance < 1e-6:
+        return True  # Same point, valid.
+
+    steps = max(int(distance / STEP_SIZE), 1)
+    unit_direction = direction / distance
+
+    for i in range(1, steps + 1):
+        intermediate_loc = from_loc + i * STEP_SIZE * unit_direction
+        intermediate_loc_int = tuple(np.round(intermediate_loc).astype(int))
+
+        if not is_valid_location(intermediate_loc_int, my_map):
             return False
-        
+
     return True
 
-def find_nearby_nodes(nodes, new_node, radius):
+def find_nearby_nodes(nodes, new_node):
     """
     Find all nodes within a given radius of the new node.
 
@@ -123,8 +132,8 @@ def find_nearby_nodes(nodes, new_node, radius):
         List of nearby nodes.
     """
     nearby_nodes = []
-    for node in nodes.items():
-        if euclidean_distance(node["loc"], new_node["loc"]) <= radius:
+    for node in nodes.values():
+        if euclidean_distance(node["loc"], new_node["loc"]) <= REWIRE_RADIUS:
             nearby_nodes.append(node)
     return nearby_nodes
 
@@ -180,7 +189,7 @@ def rrt(my_map: list, start_loc: tuple, goal_loc: tuple, h_values: dict, agent: 
 
     # Main RRT loop
     for _ in range(MAX_NODES):
-        if timer.time() - start_time > 30:
+        if timer.time() - start_time > 1000:
             print(f"RRT timeout for agent {agent}")
             return None
 
@@ -216,7 +225,7 @@ def rrt(my_map: list, start_loc: tuple, goal_loc: tuple, h_values: dict, agent: 
         node_counter += 1
         
         # Find nearby nodes
-        nearby_nodes = find_nearby_nodes(nodes, new_node, radius=1.0)
+        nearby_nodes = find_nearby_nodes(nodes, new_node)
 
         # Rewire the tree
         rewire_tree(new_node, nearby_nodes, nearest_node, my_map)
