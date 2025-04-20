@@ -6,7 +6,8 @@ from utils import is_constrained, is_goal_valid, is_valid_location, build_constr
 
 MAX_NODES = 10000  # Maximum number of nodes in the RRT tree
 GOAL_BIAS = 0.2  # Probability of sampling the goal location
-STEP_SIZE = 1.0  # Distance to extend the tree in each step
+STEP_SIZE = 0.5  # Distance to extend the tree in each step
+EPSILON = 3.0  # Maximum distance to consider a node as a neighbor
 
 
 def sample_random_location(my_map, goal_loc):
@@ -48,30 +49,26 @@ def nearest_neighbor(nodes, random_loc):
     return nearest_node
 
 
-def new_location(from_loc, to_loc, step_size):
+def new_location(from_loc, to_loc):
     """
-    Return a new location that is step_size away from from_loc in the direction of to_loc
+    Compute a new location a fixed step_size toward to_loc from from_loc.
+    Optimized for speed and flexibility.
     """
-    if euclidean_distance(from_loc, to_loc) <= step_size:
-        return to_loc
 
-    # Calculate direction vector
-    dx = to_loc[0] - from_loc[0]
-    dy = to_loc[1] - from_loc[1]
-    dz = to_loc[2] - from_loc[2]
+    from_loc = np.asarray(from_loc, dtype=np.float32)
+    to_loc = np.asarray(to_loc, dtype=np.float32)
+    
+    new_loc = from_loc.copy()
+    prev_loc = from_loc.copy()
 
-    # Normalize
-    distance = np.sqrt(dx**2 + dy**2 + dz**2)
-    dx = dx / distance * step_size
-    dy = dy / distance * step_size
-    dz = dz / distance * step_size
+    direction = to_loc - from_loc
+    distance = np.linalg.norm(direction)
 
-    # Round to nearest integer (grid-based RRT)
-    new_x = round(from_loc[0] + dx)
-    new_y = round(from_loc[1] + dy)
-    new_z = round(from_loc[2] + dz)
-
-    return (new_x, new_y, new_z)
+    step = STEP_SIZE
+    
+    for _ in np.arange(step, EPSILON + 1, step):
+        new_loc = from_loc + step * (direction / distance)
+    return tuple(np.round(new_loc).astype(int))
 
 
 def is_movement_valid(from_loc: tuple, to_loc: tuple) -> bool:
@@ -129,7 +126,7 @@ def rrt(my_map: list, start_loc: tuple, goal_loc: tuple, h_values: dict, agent: 
         nearest_node = nearest_neighbor(nodes, random_loc)
 
         # Generate new location and check validity
-        new_loc = new_location(nearest_node["loc"], random_loc, STEP_SIZE)
+        new_loc = new_location(nearest_node["loc"], random_loc)
         if not is_valid_location(new_loc, my_map):
             continue
 
