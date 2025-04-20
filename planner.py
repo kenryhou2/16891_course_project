@@ -282,7 +282,7 @@ class RRTPlanner(PathPlanner):
         
         return True
     
-    def rewire(self, nodes: Dict[int, Dict], new_node: Dict, nearby_nodes: List[int]):
+    def rewire(self, nodes: Dict[int, Dict], new_node: Dict, nearby_nodes: List[int], nearest_node: Dict):
         """
         Rewire the tree to optimize the cost.
 
@@ -290,11 +290,12 @@ class RRTPlanner(PathPlanner):
             nodes: Dictionary of nodes in the tree
             new_node: Newly added node
             nearby_nodes: List of nearby node IDs
+            nearest_node: The nearest node to the new node
         """
         for node_id in nearby_nodes:
             nearby_node = nodes[node_id]
             new_cost = nearby_node["cost"] + self.euclidean_distance(new_node["config"], nearby_node["config"])
-            if new_cost < nearby_node["cost"] + self.euclidean_distance(new_node["config"], nearby_node["config"]) and self.IsValidInterpolation(new_node["config"], nearby_node["config"]):
+            if new_cost < nearest_node["cost"] + self.euclidean_distance(new_node["config"], nearest_node["config"]) and self.IsValidInterpolation(new_node["config"], nearby_node["config"]):
                 # Update the parent and cost of the nearby node
                 new_node["parent"] = nearby_node
                 new_node["cost"] = new_cost
@@ -384,7 +385,7 @@ class RRTPlanner(PathPlanner):
             nearby_nodes = self.find_nearby_nodes(nodes, new_config)
 
             # Rewire the tree
-            self.rewire(nodes, new_node, nearby_nodes)
+            self.rewire(nodes, new_node, nearby_nodes, nearest_node)
 
             # Check if goal is reached
             if self.euclidean_distance(new_config, goal_config) < self.step_size:
