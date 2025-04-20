@@ -7,6 +7,7 @@ import os
 import logging
 import time, datetime
 import numpy as np
+import time
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -43,10 +44,11 @@ def run_multiple_ur5e_scenario():
         robot1 = UR5eRobot(position=[0, 0, 0], orientation=[0, 0, 0, 1])
         robot2 = UR5eRobot(position=[1, 0.75, 0], orientation=[0, 0, 1, 1])
         # robot3 = UR5eRobot(position=[1.1, -0.3, 0], orientation=[0, 0, 0.7071, 0.7071])
+        robot3 = UR5eRobot(position=[1.1, -0.3, 0], orientation=[0, 0, 0, 1])
 
         robots.append(robot1)
         robots.append(robot2)
-        # robots.append(robot3)
+        robots.append(robot3)
 
     except Exception as e:
         logger.error(f"Failed to load UR5e robot: {str(e)}")
@@ -61,15 +63,15 @@ def run_multiple_ur5e_scenario():
     start_configs[robot2.robot_id] = [0, 0, 0, 0, 0, 0]
     goal_configs[robot2.robot_id] = [np.pi / 2, -np.pi / 3, np.pi / 6, -np.pi / 2, np.pi / 4, 0]
     
-    # start_configs[robot3.robot_id] = [0, 0, 0, 0, 0, 0]
-    # goal_configs[robot3.robot_id] = [np.pi / 4, -np.pi / 6, np.pi / 2, -np.pi / 2, np.pi / 4, 0]
+    start_configs[robot3.robot_id] = [0, 0, 0, 0, 0, 0]
+    goal_configs[robot3.robot_id] = [np.pi / 4, -np.pi / 6, np.pi / 2, -np.pi / 2, np.pi / 4, 0]
 
     planners = {}
     for robot in robots:
-        planner = RRTPlanner(robot_model=robot, max_nodes=5000, goal_bias=0.15, step_size=0.1)
+        planner = RRTPlanner(robot_model=robot, max_nodes=500000, goal_bias=0.2, step_size=0.05, epsilon=3.0, rewire_radius= 1.0)
         planners[robot.robot_id] = planner
 
-    RRT_TIMEOUT = 800.0
+    RRT_TIMEOUT = 1000.0
 
     cbs_solver = CBSSolver(
         robots=robots,
@@ -77,13 +79,18 @@ def run_multiple_ur5e_scenario():
         obstacles=env.obstacles_in_scene,
         plane=env.plane_id,
     )
+    
+    start_time = time.time()
     paths = cbs_solver.solve(start_configs, goal_configs, timeout=RRT_TIMEOUT)
+    end_time = time.time()
+    runtime = end_time - start_time
+    
     if paths is None:
-        logger.error("Failed to plan trajectory")
+        logger.error(f"Failed to plan trajectory. Runtime: {runtime:.2f} seconds")
         env.close()
         return
     else:
-        logger.info("Trajectory planned successfully")
+        logger.info(f"Trajectory planned successfully in {runtime:.2f} seconds")
 
     controllers = {}
     DURATION = 10.0

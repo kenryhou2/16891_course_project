@@ -260,7 +260,7 @@ class CBSSolver:
         return sum(self.get_path_cost(path) for path in paths.values())
 
     def solve(
-        self, start_configs: Dict[int, List[float]], goal_configs: Dict[int, List[float]], timeout: int = 80
+        self, start_configs: Dict[int, List[float]], goal_configs: Dict[int, List[float]], timeout: float = 80
     ) -> Optional[Dict[int, List[List[float]]]]:
         """
         Find conflict-free paths for multiple robots.

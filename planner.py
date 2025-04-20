@@ -294,7 +294,7 @@ class RRTPlanner(PathPlanner):
         for node_id in nearby_nodes:
             nearby_node = nodes[node_id]
             new_cost = nearby_node["cost"] + self.euclidean_distance(new_node["config"], nearby_node["config"])
-            if new_cost < nearby_node["cost"] + self.euclidean_distance(new_node["config"], nearby_node["config"]) and IsValidInterpolation(new_node["config"], nearby_node["config"]):
+            if new_cost < nearby_node["cost"] + self.euclidean_distance(new_node["config"], nearby_node["config"]) and self.IsValidInterpolation(new_node["config"], nearby_node["config"]):
                 # Update the parent and cost of the nearby node
                 new_node["parent"] = nearby_node
                 new_node["cost"] = new_cost

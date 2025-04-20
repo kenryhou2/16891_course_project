@@ -143,6 +143,23 @@ class DataVisualizer:
             start_time = time.time()
             while time.time() - start_time < waypoint_duration:
                 env.step(1 / 240)
+                
+        # # Add a persistent marker at the final position of the end effector
+        # final_position = position_seq[-1]
+        # pybullet.addUserDebugText(
+        #     "End",
+        #     final_position,
+        #     textColorRGB=[1, 0, 0],  # Red text
+        #     textSize=1.5,
+        #     lifeTime=0,  # Persistent
+        # )
+        # pybullet.addUserDebugLine(
+        #     final_position,
+        #     [final_position[0], final_position[1], final_position[2] + 0.1],  # Small vertical line
+        #     lineColorRGB=[1, 0, 0],  # Red line
+        #     lineWidth=3,
+        #     lifeTime=0,  # Persistent
+        # )
 
         time.sleep(0.5)
         for line_id in line_ids:
