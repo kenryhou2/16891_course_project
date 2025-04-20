@@ -1,0 +1,404 @@
+#!/usr/bin/env python3
+import numpy as np
+import PyKDL
+import kdl_parser_py.urdf as kdl_urdf
+import pybullet as p
+import pybullet_data
+import time
+from urdf_parser_py.urdf import URDF
+
+# ----------------------------------------------------------
+# A) Build a KDL chain for FK + joint limits
+# ----------------------------------------------------------
+def load_robot_arm_chain(urdf_path, base_link='base_link', ee_link='ee_link'):
+    robot = URDF.from_xml_file(urdf_path)
+    ok, tree = kdl_urdf.treeFromUrdfModel(robot)
+    if not ok:
+        raise RuntimeError("Failed to parse URDF")
+    chain     = tree.getChain(base_link, ee_link)
+    fk_solver = PyKDL.ChainFkSolverPos_recursive(chain)
+
+    limits = []
+    for j in robot.joints:
+        if j.type != 'fixed':
+            limits.append((j.limit.lower, j.limit.upper))
+    return fk_solver, chain, np.array(limits)
+
+
+def fk_end_effector_z(q, fk_solver):
+    q_kdl = PyKDL.JntArray(len(q))
+    for i, qi in enumerate(q):
+        q_kdl[i] = qi
+    frame = PyKDL.Frame()
+    fk_solver.JntToCart(q_kdl, frame)
+    return frame.p[2]
+
+
+# # ----------------------------------------------------------
+# # B) Sample start/end configs above ground + within limits
+# # ----------------------------------------------------------
+# def sample_feasible_configs(n, joint_limits, fk_solver, min_z=0.2):
+#     dof    = joint_limits.shape[0]
+#     lows   = joint_limits[:,0]
+#     highs  = joint_limits[:,1]
+
+#     def sample_q():
+#         return np.random.uniform(lows, highs)
+
+#     def is_feasible(q):
+#         return (lows <= q).all() and (q <= highs).all() and \
+#                (fk_end_effector_z(q, fk_solver) > min_z)
+
+#     starts, ends = [], []
+#     while len(starts) < n:
+#         q = sample_q()
+#         if is_feasible(q):
+#             starts.append(q)
+#     while len(ends) < n:
+#         q = sample_q()
+#         if is_feasible(q):
+#             ends.append(q)
+#     return starts, ends
+def sample_feasible_configs(n, joint_limits, fk_solver, chain, min_z=0.0):
+    """
+    Rejection‑sample n starts + n ends so that:
+      1) each q lies in joint_limits
+      2) every link (segment origin) in 'chain' has z > min_z
+    """
+    dof   = joint_limits.shape[0]
+    lows  = joint_limits[:,0]
+    highs = joint_limits[:,1]
+
+    # cache the segments once
+    segments = [chain.getSegment(i) for i in range(chain.getNrOfSegments())]
+
+    def sample_q():
+        return np.random.uniform(lows, highs)
+
+    def all_links_above(q):
+        # pack into KDL JointArray
+        q_kdl = PyKDL.JntArray(dof)
+        for i, qi in enumerate(q):
+            q_kdl[i] = qi
+
+        T = PyKDL.Frame()
+        joint_idx = 0
+        for seg in segments:
+            joint = seg.getJoint()
+            if joint.getTypeName() != "None":
+                T = T * joint.pose(q_kdl[joint_idx])
+                joint_idx += 1
+            T = T * seg.getFrameToTip()
+            if T.p[2] <= min_z:
+                return False
+        return True
+
+    def is_feasible(q):
+        # joint limits
+        if np.any(q < lows) or np.any(q > highs):
+            return False
+        # full‑chain above ground
+        return all_links_above(q)
+
+    starts, ends = [], []
+    while len(starts) < n:
+        q0 = sample_q()
+        if is_feasible(q0):
+            starts.append(q0)
+    while len(ends) < n:
+        q1 = sample_q()
+        if is_feasible(q1):
+            ends.append(q1)
+    return starts, ends
+
+
+
+# ----------------------------------------------------------
+# C) Overlap & density utilities
+# ----------------------------------------------------------
+def hemisphere_overlap_fraction(R, d):
+    if d <= 0:    return 1.0
+    if d >= 2*R:  return 0.0
+    Vs    = np.pi*(4*R + d)*(2*R - d)**2/(12*d)
+    Vh    = 0.5 * Vs
+    Vhemi = 2/3 * np.pi * R**3
+    return Vh / Vhemi
+
+def average_workspace_overlap(bases, R):
+    """
+    Pairwise‑average overlap fraction for n fixed bases.
+    """
+    n = len(bases)
+    if n < 2:
+        return 0.0
+    tot, cnt = 0.0, 0
+    for i in range(n):
+        for j in range(i+1, n):
+            d = np.linalg.norm(bases[i] - bases[j])
+            tot += hemisphere_overlap_fraction(R, d)
+            cnt += 1
+    return tot / cnt
+
+def volumetric_density(n, avg_ov):
+    """
+    Total normalized overlap per arm = avg_ov * (n-1)
+    """
+    return avg_ov * (n - 1)
+
+# ----------------------------------------------------------
+# D) Equidistant base positions
+# ----------------------------------------------------------
+def generate_base_positions_equidistant(n, radius):
+    """
+    Place n bases equally spaced on a circle of given radius.
+    """
+    return np.array([
+        [radius*np.cos(2*np.pi*i/n),
+         radius*np.sin(2*np.pi*i/n),
+         0.0]
+        for i in range(n)
+    ])
+
+def find_circle_radius_for_overlap(n: int,
+                                   R: float,
+                                   target_ov: float,
+                                   tol: float = 1e-3,
+                                   max_radius: float = 5.0,
+                                   max_iter: int = 40) -> float:
+    """
+    Find the circle radius at which n equidistant arms (reach R) have
+    average pairwise overlap ≈ target_ov (in [0,1]), via bisection.
+    
+    Args:
+      n:          number of arms
+      R:          reach radius of each arm
+      target_ov:  desired avg pairwise overlap fraction (0→1)
+      tol:        acceptable error in overlap
+      max_radius: upper bound on circle radius to search
+      max_iter:   max bisection iterations
+    
+    Returns:
+      circle_radius: the radius (in meters)
+    """
+    # helper: overlap at given radius
+    def ov_at_radius(r):
+        bases = generate_base_positions_equidistant(n, r)
+        return average_workspace_overlap(bases, R)
+    
+    # bracket: at r=0, overlap=1; at r=2R, overlap=0
+    lo, hi = 0.0, 2*R
+    ov_lo, ov_hi = ov_at_radius(lo), ov_at_radius(hi)
+    if not (ov_lo >= target_ov >= ov_hi):
+        raise ValueError(f"Target {target_ov} not in [{ov_hi:.3f},{ov_lo:.3f}]")
+    
+    for _ in range(max_iter):
+        mid = 0.5*(lo+hi)
+        ov_mid = ov_at_radius(mid)
+        if abs(ov_mid - target_ov) < tol:
+            return mid
+        if ov_mid > target_ov:
+            lo = mid
+        else:
+            hi = mid
+    return 0.5*(lo+hi)
+
+
+# ----------------------------------------------------------
+# E) Test‐case generator (equidistant)
+# ----------------------------------------------------------
+def generate_test_case_equidistant(n_arms, urdf_path,
+                                   reach_radius=1.3,
+                                   circle_radius=1.0):
+    # 1) Load URDF, FK, limits
+    fk_solver, chain, joint_limits = load_robot_arm_chain(urdf_path)
+
+    # 2) Equidistant bases on circle
+    bases = generate_base_positions_equidistant(n_arms, circle_radius)
+
+    # 3) Compute average overlap
+    avg_ov = average_workspace_overlap(bases, reach_radius)
+
+    # 4) Sample feasible start/end
+    starts, ends = sample_feasible_configs(
+        n_arms,
+        joint_limits,
+        fk_solver,
+        chain,
+        min_z=0.0)
+
+    # 5) Compute densities
+    vol_den = volumetric_density(n_arms, avg_ov)
+
+    return {
+        'bases':       bases,
+        'avg_overlap': avg_ov,
+        'starts':      starts,
+        'ends':        ends,
+        'vol_density': vol_den,
+        'fk_solver':   fk_solver,
+        'joint_limits': joint_limits,
+        'chain':       chain
+    }
+
+
+def visualize(urdf_path, bases, starts, ends, R):
+    """
+    bases:    list of [x,y,0] base positions, shape (n,3)
+    starts:   list of n joint arrays (len = dof)
+    ends:     list of n joint arrays
+    R:        hemisphere radius (m)
+    """
+    # 1) start the GUI
+    p.connect(p.GUI)
+    p.setAdditionalSearchPath(pybullet_data.getDataPath())
+    p.resetSimulation()
+    p.setGravity(0,0,0)
+    p.loadURDF("plane.urdf")
+    
+    n = len(bases)
+    dof = len(starts[0])
+
+    # draw 1 m axes at the origin of the very first base
+    base0 = bases[0].tolist()
+    p.addUserDebugLine(base0, [base0[0]+1, base0[1], base0[2]], [1,0,0], 2)  # X‑axis (red)
+    p.addUserDebugLine(base0, [base0[0], base0[1]+1, base0[2]], [0,1,0], 2)  # Y‑axis (green)
+    p.addUserDebugLine(base0, [base0[0], base0[1], base0[2]+1], [0,0,1], 2)  # Z‑axis (blue)
+
+    # 2) for each arm, load start & end instances
+    start_ids = []
+    end_ids   = []
+    for i in range(n):
+        base_pos = bases[i].tolist()
+        # load start “ghost” arm
+        sid = p.loadURDF(urdf_path,
+                         basePosition=base_pos,
+                         useFixedBase=True)
+        # load end pose arm
+        eid = p.loadURDF(urdf_path,
+                         basePosition=base_pos,
+                         useFixedBase=True)
+        start_ids.append(sid)
+        end_ids.append(eid)
+        
+        # set joint states
+        for j in range(dof):
+            p.resetJointState(sid, j, starts[i][j])
+            p.resetJointState(eid, j, ends[i][j])
+
+        for uid in start_ids + end_ids: # set motor movement to zero
+            for j in range(p.getNumJoints(uid)):
+                p.setJointMotorControl2(
+                    bodyIndex=uid,
+                    jointIndex=j,
+                    controlMode=p.POSITION_CONTROL,
+                    targetPosition=p.getJointState(uid, j)[0],
+                    positionGain=0.1,   # small but nonzero
+                    velocityGain=1.0
+                )
+        
+        # apply transparency/color
+        num_links = p.getNumJoints(sid)
+        for link in range(-1, num_links):
+            # start = semi‑transparent blue
+            p.changeVisualShape(sid, link,
+                                rgbaColor=[0, 0, 1, 0.3])
+            # end   = opaque red
+            p.changeVisualShape(eid, link,
+                                rgbaColor=[1, 0, 0, 0.3])
+    
+    # 3) shade each overlap hemisphere
+    #    sample points on a half‑sphere mesh
+    pts = []
+    N_theta, N_phi = 30, 30
+    for i in range(N_theta):
+        θ = (i / (N_theta-1)) * (np.pi/2)      # from 0→π/2
+        for j in range(N_phi):
+            φ = (j / (N_phi-1)) * (2*np.pi)
+            x =  R * np.sin(θ) * np.cos(φ)
+            y =  R * np.sin(θ) * np.sin(φ)
+            z =  R * np.cos(θ)
+            pts.append([x, y, z])
+    # for each base, draw its hemisphere
+    for base in bases:
+        trans_pts = np.array(pts) + base
+        colors    = [[0.8, 0.8, 0.0] for _ in trans_pts]  # yellow
+        p.addUserDebugPoints(trans_pts.tolist(),
+                             colors,
+                             pointSize=2)
+    
+    # 4) spin the GUI
+    while p.isConnected():
+        # p.stepSimulation()
+        # time.sleep(1./240.)
+        time.sleep(1)
+
+def compute_all_joint_positions(q, fk_solver, chain):
+    dof = len(q)
+    q_kdl = PyKDL.JntArray(dof)
+    for i, qi in enumerate(q):
+        q_kdl[i] = qi
+
+    positions = []
+    frame = PyKDL.Frame()
+    for idx in range(chain.getNrOfSegments()):
+        fk_solver.JntToCart(q_kdl, frame, idx)
+        positions.append((float(frame.p[0]),
+                          float(frame.p[1]),
+                          float(frame.p[2])))
+    return positions
+
+
+if __name__ == "__main__":
+    urdf = "../assets/ur5e/ur5e.urdf"
+    n_arms       = 2
+    reach_radius = 0.85      # UR10e reach [m]
+    target_pct = 0.25      # target overlap fraction
+
+    # find the radius
+    circle_rad = find_circle_radius_for_overlap(
+        n_arms,
+        reach_radius,
+        target_pct,
+        tol=1e-3
+    )
+    print(f"Circle radius for {target_pct*100:.1f}% overlap: {circle_rad:.3f} m")
+
+    tc = generate_test_case_equidistant(
+        n_arms, urdf,
+        reach_radius=reach_radius,
+        circle_radius=circle_rad
+    )
+
+    fk = tc['fk_solver']
+    chain = tc['chain']
+
+    print(f"Equidistant circle radius: {circle_rad} m")
+    print(f"Avg pairwise overlap:      {tc['avg_overlap']*100:5.1f}%")
+    print(f"Volumetric density:        {tc['vol_density']:.2f}")
+    print("Base positions:")
+    print(tc['bases'])
+    print("Start / End joint configs:")
+    for i,(q0,q1) in enumerate(zip(tc['starts'], tc['ends'])):
+        z0 = fk_end_effector_z(q0, tc['fk_solver'])
+        z1 = fk_end_effector_z(q1, tc['fk_solver'])
+        print(f" Arm {i}: z_start={z0:.3f}, z_end={z1:.3f}, q_start={q0}, q_end={q1}")
+        start_joint_pos = compute_all_joint_positions(q0, tc['fk_solver'], tc['chain'])
+        end_joint_pos = compute_all_joint_positions(q1, tc['fk_solver'], tc['chain'])
+        #print each joint labeled with their position
+        print(f"Arm {i} start joint heights:")
+        for j,(x,y,z) in enumerate(start_joint_pos):
+            print(f"  link {j}: z={z:.3f}")
+        print(f"Arm {i} end joint heights:")
+        for j,(x,y,z) in enumerate(end_joint_pos):
+            print(f"  link {j}: z={z:.3f}")
+
+    # visualize(urdf, tc['bases'], tc['starts'], tc['ends'], R=reach_radius)
+    starts = [
+        [0, 0,  -np.pi/3, 0,      0, 0],
+        [0, 0,  np.pi/3,       0, 0, 0],
+    ]
+    ends = [
+        [ 0, 0,      0, 0, 0,      0],
+        [ 0,       0,       0,       0,      0,      0     ],
+    ]
+    visualize(urdf, tc['bases'], starts, ends, R=reach_radius)
