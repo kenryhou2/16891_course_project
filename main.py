@@ -42,7 +42,7 @@ def run_multiple_ur5e_scenario():
         # Second robot rotated 180 degrees around Z-axis (facing the first robot)
 
         robot1 = UR5eRobot(position=[0, 0, 0], orientation=[0, 0, 0, 1])
-        robot2 = UR5eRobot(position=[1, 0.75, 0], orientation=[0, 0, 1, 1])
+        robot2 = UR5eRobot(position=[1, 0, 0], orientation=[0, 0, 0, 1])
         # robot3 = UR5eRobot(position=[1.1, -0.3, 0], orientation=[0, 0, 0.7071, 0.7071])
         # robot3 = UR5eRobot(position=[1.1, -0.3, 0], orientation=[0, 0, 0, 1])
 
@@ -57,6 +57,7 @@ def run_multiple_ur5e_scenario():
 
     start_configs = {}
     goal_configs = {}
+    # start_configs[robot1.robot_id] = [0, 0, 0, 0, 0, 0]
     start_configs[robot1.robot_id] = [0, 0, 0, 0, 0, 0]
     goal_configs[robot1.robot_id] = [np.pi / 2, -np.pi / 3, np.pi / 6, -np.pi / 2, np.pi / 4, 0]
     
