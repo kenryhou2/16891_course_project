@@ -298,6 +298,7 @@ class RRTPlanner(PathPlanner):
                 # Update the parent and cost of the nearby node
                 new_node["parent"] = nearby_node
                 new_node["cost"] = new_cost
+                new_node["timestep"] = nearby_node["timestep"] + 1
 
     def plan(
         self,
