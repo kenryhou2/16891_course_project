@@ -48,11 +48,12 @@ class RRTPlanner(PathPlanner):
     def __init__(
         self,
         robot_model: Optional[RobotModel] = None,
-        max_nodes: int = 100000,
+        max_nodes: int = 500000,
         goal_bias: float = 0.2,
-        step_size: float = 0.1,
+        step_size: float = 0.05,
         epsilon: float = 3.0,
         joint_limits: Optional[List[Tuple[float, float]]] = None,
+        rewire_radius: float = 1.0,
     ):
         """
         Initialize the RRT planner.
@@ -69,6 +70,7 @@ class RRTPlanner(PathPlanner):
         self.goal_bias = goal_bias
         self.step_size = step_size
         self.epsilon = epsilon
+        self.rewire_radius = rewire_radius  
 
         # Joint limits can be provided or extracted from the robot model
         if joint_limits is None:
@@ -128,12 +130,12 @@ class RRTPlanner(PathPlanner):
         Return a new configuration that is at max epsilon away from from_config
         in the direction of to_config.
         """
-        
+        dist = self.euclidean_distance(from_config, to_config)
         new_config = from_config.copy()
         prev_config = from_config.copy()
         
         for i in np.arange(self.step_size, self.epsilon, self.step_size):
-            new_config = list(np.array(from_config) + (np.array(to_config) - np.array(from_config)) * (i / self.euclidean_distance(from_config, to_config)))
+            new_config = list(np.array(from_config) + (np.array(to_config) - np.array(from_config)) * (i / dist))
 
             # Ensure new configuration is within joint limits
             for i, (lower, upper) in enumerate(self.joint_limits):
@@ -242,6 +244,60 @@ class RRTPlanner(PathPlanner):
                 logger.info(f"Movement from {from_config} to {to_config} violates constraint {constraint}")
                 return True
         return False
+    
+    def find_nearby_nodes(self, nodes: Dict[int, Dict], new_config: List[float]) -> List[int]:
+        """
+        Find nearby nodes within the rewire radius.
+
+        Args:
+            nodes: Dictionary of nodes in the tree
+            new_config: Configuration of the new node
+
+        Returns:
+            List of node indices within the rewire radius
+        """
+        nearby_nodes = []
+        for node_id, node in nodes.items():
+            if self.euclidean_distance(node["config"], new_config) <= self.rewire_radius:
+                nearby_nodes.append(node_id)
+        return nearby_nodes
+    
+    def IsValidInterpolation(self, from_config: List[float], to_config: List[float]) -> bool:
+        """
+        Check if the interpolation between two configurations is valid.
+
+        Args:
+            from_config: Starting configuration
+            to_config: Ending configuration
+
+        Returns:
+            True if interpolation is valid, False otherwise
+        """
+        dist = self.euclidean_distance(from_config, to_config)
+        
+        for i in np.arange(0, dist, self.step_size):
+            intermediate_config = list(np.array(from_config) + (np.array(to_config) - np.array(from_config)) * (i / dist))
+            if not self.is_valid_config(intermediate_config):
+                return False
+        
+        return True
+    
+    def rewire(self, nodes: Dict[int, Dict], new_node: Dict, nearby_nodes: List[int]):
+        """
+        Rewire the tree to optimize the cost.
+
+        Args:
+            nodes: Dictionary of nodes in the tree
+            new_node: Newly added node
+            nearby_nodes: List of nearby node IDs
+        """
+        for node_id in nearby_nodes:
+            nearby_node = nodes[node_id]
+            new_cost = nearby_node["cost"] + self.euclidean_distance(new_node["config"], nearby_node["config"])
+            if new_cost < nearby_node["cost"] + self.euclidean_distance(new_node["config"], nearby_node["config"]) and IsValidInterpolation(new_node["config"], nearby_node["config"]):
+                # Update the parent and cost of the nearby node
+                new_node["parent"] = nearby_node
+                new_node["cost"] = new_cost
 
     def plan(
         self,
@@ -322,6 +378,12 @@ class RRTPlanner(PathPlanner):
             nodes[node_counter] = new_node
             node_counter += 1
             self.node_count = node_counter
+            
+            # Find nearby nodes for rewiring
+            nearby_nodes = self.find_nearby_nodes(nodes, new_config)
+
+            # Rewire the tree
+            self.rewire(nodes, new_node, nearby_nodes)
 
             # Check if goal is reached
             if self.euclidean_distance(new_config, goal_config) < self.step_size:
