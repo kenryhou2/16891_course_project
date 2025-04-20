@@ -49,7 +49,7 @@ def nearest_neighbor(nodes, random_loc):
     return nearest_node
 
 
-def new_location(from_loc, to_loc):
+def new_location(from_loc, to_loc, my_map):
     """
     Compute a new location a fixed step_size toward to_loc from from_loc.
     Optimized for speed and flexibility.
@@ -68,6 +68,17 @@ def new_location(from_loc, to_loc):
     
     for _ in np.arange(step, EPSILON + 1, step):
         new_loc = from_loc + step * (direction / distance)
+        
+        if not is_valid_location(tuple(np.round(new_loc).astype(int)), my_map) and not is_movement_valid(tuple(np.round(new_loc).astype(int)), tuple(np.round(prev_loc).astype(int))):
+            new_loc = prev_loc.copy()
+            break
+        else:
+            prev_loc = new_loc.copy()
+            
+        if np.linalg.norm(new_loc - to_loc) < step:
+            new_loc = to_loc.copy()
+            break
+        
     return tuple(np.round(new_loc).astype(int))
 
 
@@ -83,6 +94,59 @@ def is_movement_valid(from_loc: tuple, to_loc: tuple) -> bool:
     # Do not allow diagonal movement in 3D space
     return (dx + dy + dz <= 1) or (dx == 0 and dy == 0 and dz == 0)
 
+def IsValidInterploation(from_loc: tuple, to_loc: tuple, my_map: list) -> bool:
+    
+    from_loc = np.array(from_loc, dtype=np.float32)
+    to_loc = np.array(to_loc, dtype=np.float32)
+    
+    dist = np.linalg.norm(to_loc - from_loc)
+    step = STEP_SIZE
+    
+    for _ in np.arange(step, dist + 1, step):
+        loc = from_loc + step * ((to_loc - from_loc) / dist)
+        
+        if not is_valid_location(tuple(np.round(loc).astype(int)), my_map) and not is_movement_valid(tuple(np.round(loc).astype(int)), tuple(np.round(from_loc).astype(int))):
+            return False
+        
+    return True
+
+def find_nearby_nodes(nodes, new_node, radius):
+    """
+    Find all nodes within a given radius of the new node.
+
+    Args:
+        nodes: Dictionary of all nodes in the tree.
+        new_node: The newly added node.
+        radius: The radius within which to search for nearby nodes.
+
+    Returns:
+        List of nearby nodes.
+    """
+    nearby_nodes = []
+    for node in nodes.items():
+        if euclidean_distance(node["loc"], new_node["loc"]) <= radius:
+            nearby_nodes.append(node)
+    return nearby_nodes
+
+def rewire_tree(new_node, nearby_nodes, nearest_node):
+    """
+    Rewire the tree to optimize paths by connecting nearby nodes to the new node if it reduces their cost.
+
+    Args:
+        nodes: Dictionary of all nodes in the tree.
+        new_node: The newly added node.
+        nearby_nodes: List of nodes within the rewiring radius.
+
+    Returns:
+        None (modifies the tree in place).
+    """
+    for node in nearby_nodes:
+        # Calculate the cost to reach this node through the new node
+        new_cost = new_node["cost"] + euclidean_distance(new_node["loc"], node["loc"])
+        if new_cost < euclidean_distance(nearest_node["loc"], new_node["loc"]) and IsValidInterploation(new_node["loc"], node["loc"], my_map):
+            # Rewire the node
+            node["parent"] = new_node
+            node["cost"] = new_cost
 
 def rrt(my_map: list, start_loc: tuple, goal_loc: tuple, h_values: dict, agent: int, constraints: list, stop_event=None):
     """
@@ -126,7 +190,7 @@ def rrt(my_map: list, start_loc: tuple, goal_loc: tuple, h_values: dict, agent: 
         nearest_node = nearest_neighbor(nodes, random_loc)
 
         # Generate new location and check validity
-        new_loc = new_location(nearest_node["loc"], random_loc)
+        new_loc = new_location(nearest_node["loc"], random_loc, my_map)
         if not is_valid_location(new_loc, my_map):
             continue
 
@@ -149,6 +213,12 @@ def rrt(my_map: list, start_loc: tuple, goal_loc: tuple, h_values: dict, agent: 
         # Add new node to tree
         nodes[node_counter] = new_node
         node_counter += 1
+        
+        # Find nearby nodes
+        nearby_nodes = find_nearby_nodes(nodes, new_node, radius=1.0)
+
+        # Rewire the tree
+        rewire_tree(new_node, nearby_nodes, nearest_node)
 
         # Check if goal is reached
         if new_loc == goal_loc and is_goal_valid(new_node, constraint_table):
