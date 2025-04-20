@@ -94,7 +94,7 @@ def is_movement_valid(from_loc: tuple, to_loc: tuple) -> bool:
     # Do not allow diagonal movement in 3D space
     return (dx + dy + dz <= 1) or (dx == 0 and dy == 0 and dz == 0)
 
-def IsValidInterploation(from_loc: tuple, to_loc: tuple, my_map: list) -> bool:
+def IsValidInterpolation(from_loc: tuple, to_loc: tuple, my_map: list) -> bool:
     
     from_loc = np.array(from_loc, dtype=np.float32)
     to_loc = np.array(to_loc, dtype=np.float32)
@@ -128,7 +128,7 @@ def find_nearby_nodes(nodes, new_node, radius):
             nearby_nodes.append(node)
     return nearby_nodes
 
-def rewire_tree(new_node, nearby_nodes, nearest_node):
+def rewire_tree(new_node, nearby_nodes, nearest_node, my_map):
     """
     Rewire the tree to optimize paths by connecting nearby nodes to the new node if it reduces their cost.
 
@@ -140,13 +140,14 @@ def rewire_tree(new_node, nearby_nodes, nearest_node):
     Returns:
         None (modifies the tree in place).
     """
-    for node in nearby_nodes:
+    for neighbour in nearby_nodes:
         # Calculate the cost to reach this node through the new node
-        new_cost = new_node["cost"] + euclidean_distance(new_node["loc"], node["loc"])
-        if new_cost < euclidean_distance(nearest_node["loc"], new_node["loc"]) and IsValidInterploation(new_node["loc"], node["loc"], my_map):
-            # Rewire the node
-            node["parent"] = new_node
-            node["cost"] = new_cost
+        new_cost = neighbour["cost"] + euclidean_distance(new_node["loc"], neighbour["loc"])
+        if new_cost < euclidean_distance(nearest_node["loc"], new_node["loc"]) and IsValidInterpolation(new_node["loc"], neighbour["loc"], my_map):
+            # Rewire the new_node and neighbour
+            new_node["parent"] = neighbour
+            new_node["cost"] = new_cost
+            new_node["timestep"] = neighbour["timestep"] + 1
 
 def rrt(my_map: list, start_loc: tuple, goal_loc: tuple, h_values: dict, agent: int, constraints: list, stop_event=None):
     """
@@ -218,7 +219,7 @@ def rrt(my_map: list, start_loc: tuple, goal_loc: tuple, h_values: dict, agent: 
         nearby_nodes = find_nearby_nodes(nodes, new_node, radius=1.0)
 
         # Rewire the tree
-        rewire_tree(new_node, nearby_nodes, nearest_node)
+        rewire_tree(new_node, nearby_nodes, nearest_node, my_map)
 
         # Check if goal is reached
         if new_loc == goal_loc and is_goal_valid(new_node, constraint_table):

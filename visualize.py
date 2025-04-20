@@ -181,7 +181,7 @@ class Animation3D:
 
     def save(self, file_name, speed):
         """Save the animation to a file"""
-        self.animation.save(file_name, fps=10 * speed, dpi=200, savefig_kwargs={"pad_inches": 0.5, "bbox_inches": "tight"})
+        self.animation.save(file_name, writer='ffmpeg', fps=10 * speed, dpi=200, savefig_kwargs={"pad_inches": 0.5, "bbox_inches": "tight"})
         print(f"Animation saved to {file_name}")
 
     @staticmethod

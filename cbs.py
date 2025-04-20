@@ -108,7 +108,7 @@ class CBSSolver(object):
         self.debug = False
         self.solver_type = "CBS"
 
-        self.planner_type = "A*"  # or "RRT" for RRT planner
+        # self.planner_type = "A*"  # or "RRT" for RRT planner
         self.planner_type = "RRT"
 
         # compute heuristics for the low-level search
