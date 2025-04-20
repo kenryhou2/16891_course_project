@@ -50,10 +50,10 @@ class RRTPlanner(PathPlanner):
         robot_model: Optional[RobotModel] = None,
         max_nodes: int = 500000,
         goal_bias: float = 0.2,
-        step_size: float = 0.05,
-        epsilon: float = 3.0,
+        step_size: float = 0.01,
+        epsilon: float = 0.1,
         joint_limits: Optional[List[Tuple[float, float]]] = None,
-        rewire_radius: float = 1.0,
+        rewire_radius: float = 0.05,
     ):
         """
         Initialize the RRT planner.
