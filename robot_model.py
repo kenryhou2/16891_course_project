@@ -44,7 +44,12 @@ class RobotModel:
             position: Initial position [x, y, z]
             orientation: Initial orientation as quaternion [x, y, z, w]
         """
-        self.robot_id = pybullet.loadURDF(urdf_path, position, orientation)
+        self.robot_id = pybullet.loadURDF(
+            urdf_path,
+            position,
+            orientation,
+            flags=pybullet.URDF_USE_MATERIAL_COLORS_FROM_MTL,
+        )
         self.robot_position = position
         self.robot_orientation = orientation
 
@@ -58,6 +63,7 @@ class RobotModel:
 
         self.joint_configs = self.load_joint_info()
         self.movable_joints = [j.index for j in self.joint_configs if pybullet.getJointInfo(self.robot_id, j.index)[2] != pybullet.JOINT_FIXED]
+        print(f"Movable joints: {self.movable_joints}")
 
         # undirected adjacency graph of links
         self.undirected_link_graph = {}

@@ -97,6 +97,7 @@ class DataVisualizer:
 
         plt.show()
 
+    @staticmethod
     def visualize_ee_path(robot_model, path, env, duration=5.0, line_color=[0, 0.7, 0], line_width=5, draw_trail=True):
         """
         Execute a path on the robot while visualizing the end effector trajectory.
@@ -142,6 +143,80 @@ class DataVisualizer:
 
             start_time = time.time()
             while time.time() - start_time < waypoint_duration:
+                env.step(1 / 240)
+
+        time.sleep(0.5)
+        for line_id in line_ids:
+            pybullet.removeUserDebugItem(line_id)
+
+    @staticmethod
+    def visualize_multiple_ee_paths(robots, paths, env, colors=None, duration=3.0, line_width=5):
+        """
+        Visualize end-effector paths for multiple robots simultaneously.
+
+        Args:
+            robots: List of robot models
+            paths: Dict mapping robot IDs to paths
+            env: Simulation environment
+            colors: List of colors for each robot's path (default: vibrant colors)
+            duration: Visualization duration
+            line_width: Width of path lines
+        """
+        if colors is None:
+            colors = [
+                [0.8, 0.2, 0.8],  # Vibrant purple
+                [0.0, 0.6, 1.0],  # Bright blue
+                [1.0, 0.6, 0.0],  # Vibrant orange
+                [0.0, 0.8, 0.4],  # Bright teal
+                [1.0, 0.4, 0.4],  # Coral red
+                [0.6, 0.8, 0.0],  # Lime green
+            ]
+
+        # Calculate position sequences for all robots
+        position_sequences = {}
+        for robot in robots:
+            if robot.robot_id in paths and paths[robot.robot_id]:
+                position_sequences[robot.robot_id] = config_to_position_path(paths[robot.robot_id], robot)
+
+        # Calculate visualization timing
+        max_points = max([len(pos_seq) for pos_seq in position_sequences.values()], default=0)
+        if max_points == 0:
+            logger.warning("No paths to visualize")
+            return
+        # waypoint_duration = duration / max_points
+
+        # Draw all paths
+        line_ids = []
+        for i, robot in enumerate(robots):
+            if robot.robot_id not in position_sequences:
+                continue
+
+            logger.info(f"Executing path for robot {robot.robot_id}")
+            pos_seq = position_sequences[robot.robot_id]
+            color = colors[i % len(colors)]
+
+            # Draw complete path
+            for j in range(len(pos_seq) - 1):
+                line_id = pybullet.addUserDebugLine(
+                    pos_seq[j],
+                    pos_seq[j + 1],
+                    lineColorRGB=color,
+                    lineWidth=line_width,
+                    lifeTime=0,
+                )
+                line_ids.append(line_id)
+
+            if len(pos_seq) > 0:
+                pybullet.addUserDebugText(
+                    f"{i+1}",
+                    pos_seq[0],
+                    textColorRGB=color,
+                    textSize=1.0,
+                    lifeTime=duration,
+                )
+
+            start_time = time.time()
+            while time.time() - start_time < duration:
                 env.step(1 / 240)
 
         time.sleep(0.5)

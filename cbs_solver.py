@@ -349,6 +349,6 @@ class CBSSolver:
 
         # If we get here, no solution was found
         logger.warning(f"CBS failed to find a solution after expanding {self.num_of_expanded} nodes")
-        pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 1)
+        # pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 1)
 
         return None

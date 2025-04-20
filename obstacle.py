@@ -121,7 +121,7 @@ class Obstacle:
         The robot state is modified to check for collision, so save and restore the state before and after resetting.
         """
         # pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 0)
-        state_id = pybullet.saveState()
+        # state_id = pybullet.saveState()
 
         for i, joint_idx in enumerate(robot_model.movable_joints):
             if i < len(config):
@@ -134,7 +134,7 @@ class Obstacle:
                 in_collision = True
                 break
 
-        pybullet.restoreState(stateId=state_id)
+        # pybullet.restoreState(stateId=state_id)
         # pybullet.configureDebugVisualizer(pybullet.COV_ENABLE_RENDERING, 1)
         return in_collision
 

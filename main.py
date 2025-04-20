@@ -32,7 +32,7 @@ def run_multiple_ur5e_scenario():
 
     # Create environment
     env = SimulationEnvironment(gui=True)
-    env.reset_camera(distance=1, yaw=60, pitch=-60, target_pos=[1.6, -0.3, 1.65])
+    env.reset_camera(distance=1, yaw=60, pitch=-60, target_pos=[1.6, -0.3, 1.15])
     env.setup_obstacles()
 
     # Load UR5e robot
@@ -42,7 +42,7 @@ def run_multiple_ur5e_scenario():
 
         robot1 = UR5eRobot(position=[0, 0, 0], orientation=[0, 0, 0, 1])
         robot2 = UR5eRobot(position=[1, 0.75, 0], orientation=[0, 0, 1, 1])
-        robot3 = UR5eRobot(position=[1.1, -0.3, 0], orientation=[0, 0, 0.7071, 0.7071])
+        robot3 = UR5eRobot(position=[1.1, -0.3, 0], orientation=[0, 0, 1, 1])
 
         robots.append(robot1)
         robots.append(robot2)
@@ -60,11 +60,13 @@ def run_multiple_ur5e_scenario():
     start_configs[robot3.robot_id] = [0, 0, 0, 0, 0, 0]
     goal_configs[robot1.robot_id] = [np.pi / 2, -np.pi / 3, np.pi / 6, -np.pi / 2, np.pi / 4, 0]
     goal_configs[robot2.robot_id] = [np.pi / 2, -np.pi / 3, np.pi / 6, -np.pi / 2, np.pi / 4, 0]
-    goal_configs[robot3.robot_id] = [np.pi / 4, -np.pi / 6, np.pi / 2, -np.pi / 2, np.pi / 4, 0]
+    goal_configs[robot3.robot_id] = [np.pi / 4, -np.pi / 3, np.pi / 2, -np.pi / 2, np.pi / 4, 0]
+    # goal_configs[robot3.robot_id] = [np.pi / 4, -np.pi / 6, np.pi / 2, -np.pi / 2, np.pi / 4, 0]
+    # goal_configs[robot3.robot_id] = [np.pi / 4, -np.pi / 3, np.pi / 4, -np.pi / 4, np.pi / 4, 0]
 
     planners = {}
     for robot in robots:
-        planner = RRTPlanner(robot_model=robot, max_nodes=5000, goal_bias=0.15, step_size=0.1)
+        planner = RRTPlanner(robot_model=robot, max_nodes=50000, goal_bias=0.15, step_size=0.1)
         planners[robot.robot_id] = planner
 
     RRT_TIMEOUT = 800.0
@@ -109,13 +111,14 @@ def run_multiple_ur5e_scenario():
     try:
         # Run simulation
         logger.info("Starting UR5e simulation")
-
-        line_colors = [[0.8, 0.2, 0.8], [0.0, 0.6, 1.0], [1.0, 0.6, 0.0]]  # Vibrant purple  # Bright blue  # Vibrant orange
-        for i, robot in enumerate(robots):
-            path = paths[robot.robot_id]
-            if path is not None:
-                color_index = i % len(line_colors)
-                DataVisualizer.visualize_ee_path(robot, path, env, duration=1, line_color=line_colors[color_index], line_width=10)
+        DataVisualizer.visualize_multiple_ee_paths(
+            robots,
+            paths,
+            env,
+            colors=None,
+            duration=1.0,
+            line_width=5,
+        )
 
         history = simulator.run(duration=30.0, dt=1 / 240)
 
