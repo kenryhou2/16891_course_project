@@ -649,7 +649,7 @@ if __name__ == "__main__":
     urdf = "../assets/ur5e/ur5e.urdf"
     n_arms       = 2
     reach_radius = 0.85      # UR10e reach [m]
-    target_pct = 0.35      # target overlap fraction
+    target_pct = 0.45      # target overlap fraction
 
     # find the radius
     circle_rad = find_circle_radius_for_overlap(
@@ -673,13 +673,15 @@ if __name__ == "__main__":
     print(f"Avg pairwise overlap:      {tc['avg_overlap']*100:5.1f}%")
     print(f"Volumetric density:        {tc['vol_density']:.2f}")
     print("Base positions:")
-    print(tc['bases'])
+    # enumerate over bases, separating x, y, z with commas
+    for i, base in enumerate(tc['bases']):
+        print(f"  Arm {i}: [{base[0]:.3f}, {base[1]:.3f}, {base[2]:.3f}]")
     print("Start / End joint configs:")
     for i,(q0,q1) in enumerate(zip(tc['starts'], tc['ends'])):
         z0 = fk_end_effector_z(q0, tc['fk_solver'])
         z1 = fk_end_effector_z(q1, tc['fk_solver'])
         # print(f" Arm {i}: z_start={z0:.3f}, z_end={z1:.3f}, q_start={q0}, q_end={q1}")
-        print(f" Arm {i}: q_start={q0}, q_end={q1}")
+        # print(f" Arm {i}: q_start={q0}, q_end={q1}")
         start_joint_pos = compute_all_joint_positions(q0, tc['fk_solver'], tc['chain'])
         end_joint_pos = compute_all_joint_positions(q1, tc['fk_solver'], tc['chain'])
         #print each joint labeled with their position
@@ -689,8 +691,8 @@ if __name__ == "__main__":
         # print(f"Arm {i} end joint heights:")
         # for j,(x,y,z) in enumerate(end_joint_pos):
         #     print(f"  link {j}: z={z:.3f}")
-    print(f"starts: {tc['starts']}")
-    print(f"ends:   {tc['ends']}")
+    # print(f"starts: {tc['starts']}")
+    # print(f"ends:   {tc['ends']}")
     # starts = np.array(tc['starts'])
     # ends   = np.array(tc['ends'])
     # visualize(urdf, tc['bases'], tc['starts'], tc['ends'], R=reach_radius)
@@ -704,4 +706,4 @@ if __name__ == "__main__":
     ]
     # visualize(urdf, tc['bases'], starts, ends, R=reach_radius)
     visualize_interactive(urdf, tc['bases'], starts, reach_radius)
-    visualize_interactive_dual(urdf, tc['bases'], starts, ends, reach_radius)
+    # visualize_interactive_dual(urdf, tc['bases'], starts, ends, reach_radius)
