@@ -367,44 +367,179 @@ def generate_test_case_equidistant(n_arms, urdf_path,
 #         # time.sleep(1./240.)
 #         time.sleep(1)
 
-def visualize_interactive(urdf_path, bases, init_qs, R):
+# def visualize_interactive(urdf_path, bases, init_qs, R):
+#     p.connect(p.GUI)
+#     p.setAdditionalSearchPath(pybullet_data.getDataPath())
+#     p.resetSimulation()
+#     p.setGravity(0,0,0)
+#     p.loadURDF("plane.urdf")
+
+#     n_arms = len(bases)
+#     dof    = len(init_qs[0])
+
+#     # 1) Load all arms in their initial pose
+#     robot_ids = []
+#     for i in range(n_arms):
+#         uid = p.loadURDF(urdf_path, bases[i].tolist(), [0,0,0,1], useFixedBase=True)
+#         robot_ids.append(uid)
+#         for j in range(dof):
+#             p.resetJointState(uid, j, init_qs[i][j])
+
+#     # 2) Build a slider panel: one slider per (arm, joint)
+#     slider_ids = []
+#     for i in range(n_arms):
+#         for j in range(dof):
+#             name = f"arm{i}_joint{j}"
+#             # adjust these limits to your robot’s joint limits
+#             low, high = -np.pi, np.pi
+#             init = init_qs[i][j]
+#             sid  = p.addUserDebugParameter(name, low, high, init)
+#             slider_ids.append((i, j, sid))
+
+#     # 3) Main loop: read sliders, update joints, step sim
+#     while p.isConnected():
+#         # for each slider, grab its current angle
+#         for (i, j, sid) in slider_ids:
+#             θ = p.readUserDebugParameter(sid)
+#             p.resetJointState(robot_ids[i], j, θ)
+
+#         p.stepSimulation()
+#         time.sleep(1/240.)
+def print_joint_values(robot_ids, dof):
+    """Query and print joint angles for each arm."""
+    for i, uid in enumerate(robot_ids):
+        angles = [p.getJointState(uid, j)[0] for j in range(dof)]
+        print(f"Arm {i} joints: {angles}")
+
+# def visualize_interactive(urdf_path, bases, start_qs, R):
+#     """
+#     urdf_path:  path to your URDF
+#     bases:      list of [x,y,0] base positions, shape (n_arms,3)
+#     start_qs:   list of n_arms joint vectors (len=dof) → initial pose
+#     R:          reach‐radius (m) to draw hemisphere boundary
+#     """
+#     # --- 1) connect and reset ---
+#     p.connect(p.GUI)
+#     p.setAdditionalSearchPath(pybullet_data.getDataPath())
+#     p.resetSimulation()
+#     p.setGravity(0, 0, 0)
+#     p.loadURDF("plane.urdf")
+
+#     n_arms = len(bases)
+#     dof    = len(start_qs[0])
+
+#     # --- 2) draw reach hemisphere boundaries (circle on ground) ---
+#     circle_pts = 64
+#     for bx, by, _ in bases:
+#         pts = []
+#         angles = np.linspace(0, 2*np.pi, circle_pts, endpoint=True)
+#         for θ in angles:
+#             x = bx + R * np.cos(θ)
+#             y = by + R * np.sin(θ)
+#             pts.append((x, y, 0.001))  # slight lift so it shows over the plane
+#         # connect point i to i+1
+#         for i in range(circle_pts):
+#             p.addUserDebugLine(pts[i], pts[(i+1) % circle_pts], [1,1,1])
+
+#     # --- 3) load all arms at their start poses ---
+#     robot_ids = []
+#     for i, base in enumerate(bases):
+#         uid = p.loadURDF(urdf_path, base, [0,0,0,1], useFixedBase=True)
+#         robot_ids.append(uid)
+#         # reset each joint to its start configuration
+#         for j in range(dof):
+#             p.resetJointState(uid, j, start_qs[i][j])
+
+#     # --- 4) create sliders initialized at start_qs ---
+#     slider_ids = []
+#     # (you could replace [-π,π] with your robot’s actual limits)
+#     low_limits  = [-np.pi]*dof
+#     high_limits = [ np.pi]*dof
+#     for i in range(n_arms):
+#         for j in range(dof):
+#             name = f"arm{i}_joint{j}"
+#             init = start_qs[i][j]
+#             sid  = p.addUserDebugParameter(name, low_limits[j], high_limits[j], init)
+#             slider_ids.append((i, j, sid))
+
+#     # --- 5) main loop: read sliders → update joint states → step sim ---
+#     try:
+#         while p.isConnected():
+#             for (i, j, sid) in slider_ids:
+#                 θ = p.readUserDebugParameter(sid)
+#                 p.resetJointState(robot_ids[i], j, θ)
+#             p.stepSimulation()
+#             time.sleep(1/240.)
+#     except KeyboardInterrupt:
+#         p.disconnect()
+def visualize_interactive(urdf_path, bases, start_qs, R):
+    """
+    urdf_path: path to URDF
+    bases:     list of [x,y,0] base positions
+    start_qs:  list of initial joint arrays
+    R:         reach radius (m)
+    """
+    # --- Connect and reset sim ---
     p.connect(p.GUI)
     p.setAdditionalSearchPath(pybullet_data.getDataPath())
     p.resetSimulation()
-    p.setGravity(0,0,0)
+    p.setGravity(0, 0, 0)
     p.loadURDF("plane.urdf")
 
     n_arms = len(bases)
-    dof    = len(init_qs[0])
+    dof    = len(start_qs[0])
 
-    # 1) Load all arms in their initial pose
+    # --- Draw reach circles on the ground ---
+    circle_pts = 64
+    for bx, by, _ in bases:
+        pts = []
+        angles = np.linspace(0, 2*np.pi, circle_pts, endpoint=True)
+        for θ in angles:
+            x = bx + R * np.cos(θ)
+            y = by + R * np.sin(θ)
+            pts.append((x, y, 0.001))
+        for i in range(circle_pts):
+            p.addUserDebugLine(pts[i], pts[(i+1) % circle_pts], [1,1,1])
+
+    # --- Load arms at start poses ---
     robot_ids = []
-    for i in range(n_arms):
-        uid = p.loadURDF(urdf_path, bases[i].tolist(), [0,0,0,1], useFixedBase=True)
+    for i, base in enumerate(bases):
+        uid = p.loadURDF(urdf_path, base, [0,0,0,1], useFixedBase=True)
         robot_ids.append(uid)
         for j in range(dof):
-            p.resetJointState(uid, j, init_qs[i][j])
+            p.resetJointState(uid, j, start_qs[i][j])
 
-    # 2) Build a slider panel: one slider per (arm, joint)
+    # --- Create sliders initialized to start_qs ---
     slider_ids = []
+    low_limits  = [-np.pi]*dof
+    high_limits = [ np.pi]*dof
     for i in range(n_arms):
         for j in range(dof):
             name = f"arm{i}_joint{j}"
-            # adjust these limits to your robot’s joint limits
-            low, high = -np.pi, np.pi
-            init = init_qs[i][j]
-            sid  = p.addUserDebugParameter(name, low, high, init)
+            init = start_qs[i][j]
+            sid  = p.addUserDebugParameter(name, low_limits[j], high_limits[j], init)
             slider_ids.append((i, j, sid))
 
-    # 3) Main loop: read sliders, update joints, step sim
-    while p.isConnected():
-        # for each slider, grab its current angle
-        for (i, j, sid) in slider_ids:
-            θ = p.readUserDebugParameter(sid)
-            p.resetJointState(robot_ids[i], j, θ)
+    # --- Main loop: update joints + print every 5s + step sim ---
+    last_print = time.time()
+    try:
+        while p.isConnected():
+            # 1) read sliders → update joints
+            for (i, j, sid) in slider_ids:
+                θ = p.readUserDebugParameter(sid)
+                p.resetJointState(robot_ids[i], j, θ)
 
-        p.stepSimulation()
-        time.sleep(1/240.)
+            # 2) check timer and print
+            now = time.time()
+            if now - last_print >= 5.0:
+                print_joint_values(robot_ids, dof)
+                last_print = now
+
+            # 3) step
+            p.stepSimulation()
+            time.sleep(1/240.)
+    except KeyboardInterrupt:
+        p.disconnect()
 
 def visualize_interactive_dual(urdf_path, bases, starts, ends, R):
     """
@@ -514,7 +649,7 @@ if __name__ == "__main__":
     urdf = "../assets/ur5e/ur5e.urdf"
     n_arms       = 2
     reach_radius = 0.85      # UR10e reach [m]
-    target_pct = 0.25      # target overlap fraction
+    target_pct = 0.35      # target overlap fraction
 
     # find the radius
     circle_rad = find_circle_radius_for_overlap(
@@ -568,5 +703,5 @@ if __name__ == "__main__":
         [ -0.30105307, -1.23680399,  0.46000592, -2.48329919,  3.48096511,  2.76031482],
     ]
     # visualize(urdf, tc['bases'], starts, ends, R=reach_radius)
-    # visualize_interactive(urdf, tc['bases'], starts, reach_radius)
+    visualize_interactive(urdf, tc['bases'], starts, reach_radius)
     visualize_interactive_dual(urdf, tc['bases'], starts, ends, reach_radius)
