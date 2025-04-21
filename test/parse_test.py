@@ -28,7 +28,7 @@ def parse_config_file(filepath):
 
 # Example usage
 if __name__ == "__main__":
-    filepath = "./test_3arms_55p_coverage.txt"  # Replace with your file path
+    filepath = "./test_4arms_55p_coverage.txt"  # Replace with your file path
     parsed_data = parse_config_file(filepath)
 
     for k, v in parsed_data.items():

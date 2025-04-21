@@ -698,7 +698,7 @@ def compute_all_joint_positions(q, fk_solver, chain):
 
 if __name__ == "__main__":
     urdf = "../assets/ur5e/ur5e.urdf"
-    n_arms       = 3
+    n_arms       = 4
     reach_radius = 0.85      # UR10e reach [m]
     target_pct = 0.55      # target overlap fraction
 
