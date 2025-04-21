@@ -1,5 +1,5 @@
 """
-Path planning algorithms for robot motion planning.
+Path planning algorithms for robot only arm motion planning.
 """
 
 import abc
@@ -131,15 +131,16 @@ class RRTPlanner(PathPlanner):
         in the direction of to_config.
         """
         dist = self.euclidean_distance(from_config, to_config)
+        direction = np.array(to_config) - np.array(from_config)
+        if dist < 1e-6:
+            # Already at the target configuration
+            return to_config.copy()
+        
         new_config = from_config.copy()
         prev_config = from_config.copy()
         
         for i in np.arange(self.step_size, self.epsilon, self.step_size):
-            new_config = list(np.array(from_config) + (np.array(to_config) - np.array(from_config)) * (i / dist))
-
-            # Ensure new configuration is within joint limits
-            for i, (lower, upper) in enumerate(self.joint_limits):
-                new_config[i] = max(lower, min(upper, new_config[i]))
+            new_config = list(np.array(from_config) + (direction) * (i / dist))
                 
             if not self.is_valid_config(new_config, obstacles):
                 new_config = prev_config.copy()
@@ -360,9 +361,9 @@ class RRTPlanner(PathPlanner):
             if not self.is_valid_config(config=new_config, obstacles=obstacles):
                 continue
 
-            # # Check if movement to new configuration is valid
-            # if not self.is_valid_movement(from_config=nearest_node["config"], to_config=new_config, obstacles=obstacles):
-            #     continue
+            # Check if movement to new configuration is valid
+            if not self.is_valid_movement(from_config=nearest_node["config"], to_config=new_config, obstacles=obstacles):
+                continue
 
             new_timestep = nearest_node["timestep"] + 1
             if self.constraints and self.is_constrained(nearest_node["config"], new_config, new_timestep):

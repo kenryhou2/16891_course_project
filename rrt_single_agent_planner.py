@@ -1,3 +1,6 @@
+
+# This code if ro drones only
+
 import time as timer
 import numpy as np
 import random

@@ -8,6 +8,7 @@ import logging
 import time, datetime
 import numpy as np
 import time
+import imageio
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -78,7 +79,7 @@ def run_multiple_ur5e_scenario():
 
     planners = {}
     for robot in robots:
-        planner = RRTPlanner(robot_model=robot, max_nodes=5000000, goal_bias=0.2, step_size=0.5, epsilon=3, rewire_radius= 0.5)
+        planner = RRTPlanner(robot_model=robot, max_nodes=5000000, goal_bias=0.2, step_size=0.1, epsilon=2, rewire_radius= 0.5)
         planners[robot.robot_id] = planner
 
     RRT_TIMEOUT = 10000.0
@@ -125,31 +126,73 @@ def run_multiple_ur5e_scenario():
     # Create simulator
     simulator = Simulator(robot_model=robots, controllers=controllers, environment=env)
 
+    # try:
+    #     # Run simulation
+    #     logger.info("Starting UR5e simulation")
+
+    #     line_colors = [[0.8, 0.2, 0.8], [0.0, 0.6, 1.0], [1.0, 0.6, 0.0]]  # Vibrant purple  # Bright blue  # Vibrant orange
+    #     for i, robot in enumerate(robots):
+    #         path = paths[robot.robot_id]
+    #         if path is not None:
+    #             color_index = i % len(line_colors)
+    #             DataVisualizer.visualize_ee_path(robot, path, env, duration=1, line_color=line_colors[color_index], line_width=10)
+
+    #     history = simulator.run(duration=30.0, dt=1 / 240)
+
+    #     # Visualize results
+    #     DataVisualizer.plot_joint_trajectories(history, "UR5e Robot Joint Trajectories")
+
+    #     # Save results
+    #     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    #     results_path = os.path.join(os.path.dirname(__file__), ".", "data", "simulation_results", f"ur5e_sim_{(timestamp)}.json")
+
+    #     # Print CBS expanded nodes and runtime
+    #     expanded_nodes = cbs_solver.get_expanded_nodes()  # Assuming this method exists
+    #     logger.info(f"CBS Expanded Nodes: {expanded_nodes}")
+    #     logger.info(f"Total Runtime: {runtime:.2f} seconds")
+        
+    #     logger.info(f"Saving History results to {results_path}")
+    #     save_history(history, results_path)
+
+    # except Exception as e:
+    #     logger.error(f"Simulation error: {str(e)}")
+
+    # finally:
+    #     # Clean up
+    #     simulator.close()
+
     try:
         # Run simulation
         logger.info("Starting UR5e simulation")
 
-        line_colors = [[0.8, 0.2, 0.8], [0.0, 0.6, 1.0], [1.0, 0.6, 0.0]]  # Vibrant purple  # Bright blue  # Vibrant orange
+        line_colors = [[0.8, 0.2, 0.8], [0.0, 0.6, 1.0], [1.0, 0.6, 0.0]]  # Vibrant purple, Bright blue, Vibrant orange
         for i, robot in enumerate(robots):
             path = paths[robot.robot_id]
             if path is not None:
                 color_index = i % len(line_colors)
                 DataVisualizer.visualize_ee_path(robot, path, env, duration=1, line_color=line_colors[color_index], line_width=10)
 
-        history = simulator.run(duration=30.0, dt=1 / 240)
+        # Initialize a list to store frames
+        frames = []
+
+        # Run the simulation and capture frames
+        for _ in range(int(30.0 * 240)):  # Assuming 30 seconds at 240 Hz
+            simulator.step_simulation()
+            frame = env.capture_frame()  # Assuming `capture_frame` is a method to capture the current frame as an image
+            frames.append(frame)
+
+        # Save the frames as a GIF
+        gif_path = os.path.join(os.path.dirname(__file__), ".", "data", "simulation_results", "simulation.gif")
+        imageio.mimsave(gif_path, frames, fps=30)
+        logger.info(f"Simulation saved as GIF at {gif_path}")
 
         # Visualize results
+        history = simulator.get_history()  # Assuming this method exists
         DataVisualizer.plot_joint_trajectories(history, "UR5e Robot Joint Trajectories")
 
         # Save results
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         results_path = os.path.join(os.path.dirname(__file__), ".", "data", "simulation_results", f"ur5e_sim_{(timestamp)}.json")
-
-        # Print CBS expanded nodes and runtime
-        expanded_nodes = cbs_solver.get_expanded_nodes()  # Assuming this method exists
-        logger.info(f"CBS Expanded Nodes: {expanded_nodes}")
-        logger.info(f"Total Runtime: {runtime:.2f} seconds")
-        
         logger.info(f"Saving History results to {results_path}")
         save_history(history, results_path)
 
@@ -159,7 +202,6 @@ def run_multiple_ur5e_scenario():
     finally:
         # Clean up
         simulator.close()
-
-
+    
 if __name__ == "__main__":
     run_multiple_ur5e_scenario()
