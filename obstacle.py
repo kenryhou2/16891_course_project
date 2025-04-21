@@ -148,11 +148,11 @@ def create_test_obstacles() -> List[Obstacle]:
     """Create a set of test obstacles for RRT planning."""
     obstacles = []
 
-    box = Obstacle(position=[0.5, 0.0, 0.8], obstacle_type="box", size=[0.1, 0.1, 0.1], color=[1, 0, 0, 0.7])  # Red, semi-transparent
-    obstacles.append(box)
+    # box = Obstacle(position=[0.5, 0.0, 0.8], obstacle_type="box", size=[0.1, 0.1, 0.1], color=[1, 0, 0, 0.7])  # Red, semi-transparent
+    # obstacles.append(box)
 
-    sphere = Obstacle(position=[0.5, 0.5, 0.5], obstacle_type="sphere", size=0.15, color=[0, 1, 0, 0.7])  # Green, semi-transparent
-    obstacles.append(sphere)
+    # sphere = Obstacle(position=[0.5, 0.5, 0.5], obstacle_type="sphere", size=0.15, color=[0, 1, 0, 0.7])  # Green, semi-transparent
+    # obstacles.append(sphere)
     
     # # Add a shelf (large box)
     # shelf = Obstacle(

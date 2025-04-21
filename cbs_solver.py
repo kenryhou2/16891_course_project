@@ -258,6 +258,15 @@ class CBSSolver:
             Total cost
         """
         return sum(self.get_path_cost(path) for path in paths.values())
+    
+    def get_expanded_nodes(self) -> int:
+        """
+        Get the total number of expanded nodes.
+
+        Returns:
+            int: Total number of expanded nodes.
+        """
+        return self.num_of_expanded
 
     def solve(
         self, start_configs: Dict[int, List[float]], goal_configs: Dict[int, List[float]], timeout: float = 3000.0

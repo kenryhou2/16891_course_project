@@ -41,11 +41,13 @@ def run_multiple_ur5e_scenario():
     try:
         # Second robot rotated 180 degrees around Z-axis (facing the first robot)
 
-        robot1 = UR5eRobot(position=[0, 0, 0], orientation=[0, 0, 0, 1])
-        robot2 = UR5eRobot(position=[1, 0.75, 0], orientation=[0, 0, 1, 1])
+        # robot1 = UR5eRobot(position=[0, 0, 0], orientation=[0, 0, 0, 1])
+        # robot2 = UR5eRobot(position=[1, 0.75, 0], orientation=[0, 0, 1, 1])
         # robot3 = UR5eRobot(position=[1.1, -0.3, 0], orientation=[0, 0, 0.7071, 0.7071])
         # robot3 = UR5eRobot(position=[1.1, -0.3, 0], orientation=[0, 0, 0, 1])
         
+        robot1 = UR5eRobot(position=[4.81445312e-01,  0.00000000e+00,  0.00000000e+00], orientation=[0, 0, 0, 1])
+        robot2 = UR5eRobot(position=[-4.81445312e-01,  5.89600461e-17,  0.00000000e+00], orientation=[0, 0, 0, 1])
 
         robots.append(robot1)
         robots.append(robot2)
@@ -59,21 +61,27 @@ def run_multiple_ur5e_scenario():
     start_configs = {}
     goal_configs = {}
     # start_configs[robot1.robot_id] = [0, 0, 0, 0, 0, 0]
-    start_configs[robot1.robot_id] = [0, 0, 0, 0, 0, 0]
-    goal_configs[robot1.robot_id] = [np.pi / 2, -np.pi / 3, np.pi / 6, -np.pi / 2, np.pi / 4, 0]
     
-    start_configs[robot2.robot_id] = [0, 0, 0, 0, 0, 0]
-    goal_configs[robot2.robot_id] = [np.pi / 2, -np.pi / 3, np.pi / 6, -np.pi / 2, np.pi / 4, 0]
+    # start_configs[robot1.robot_id] = [0, 0, 0, 0, 0, 0]
+    # goal_configs[robot1.robot_id] = [np.pi / 2, -np.pi / 3, np.pi / 6, -np.pi / 2, np.pi / 4, 0]
     
+    start_configs[robot1.robot_id] = [0.0, -1.884955644607544, -0.5952491760253906, 1.058220624923706, -1.025151252746582, 0.892874002456665] 
+    goal_configs[robot1.robot_id] = [0.0, 0.0, -1.488122820854187, -0.7275266647338867, -1.421984076499939, 1.6204006671905518] 
+    # start_configs[robot2.robot_id] = [0, 0, 0, 0, 0, 0]
+    # goal_configs[robot2.robot_id] = [np.pi / 2, -np.pi / 3, np.pi / 6, -np.pi / 2, np.pi / 4, 0]
+    
+    start_configs[robot2.robot_id] = [0.0, 0.46297168731689453, -0.5291101932525635, -0.3968327045440674, -1.2897065877914429, 0.4299023151397705] 
+    goal_configs[robot2.robot_id] = [0.0, -1.1904983520507812, -0.33069396018981934, -1.421984076499939, -0.33069396018981934, -1.5873310565948486] 
+
     # start_configs[robot3.robot_id] = [0, 0, 0, 0, 0, 0]
     # goal_configs[robot3.robot_id] = [np.pi / 4, -np.pi / 6, np.pi / 2, -np.pi / 2, np.pi / 4, 0]
 
     planners = {}
     for robot in robots:
-        planner = RRTPlanner(robot_model=robot, max_nodes=500000, goal_bias=0.2, step_size=0.05, epsilon=3.0, rewire_radius= 1.0)
+        planner = RRTPlanner(robot_model=robot, max_nodes=5000000, goal_bias=0.2, step_size=0.5, epsilon=3, rewire_radius= 0.5)
         planners[robot.robot_id] = planner
 
-    RRT_TIMEOUT = 1000.0
+    RRT_TIMEOUT = 10000.0
 
     cbs_solver = CBSSolver(
         robots=robots,
@@ -137,6 +145,11 @@ def run_multiple_ur5e_scenario():
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         results_path = os.path.join(os.path.dirname(__file__), ".", "data", "simulation_results", f"ur5e_sim_{(timestamp)}.json")
 
+        # Print CBS expanded nodes and runtime
+        expanded_nodes = cbs_solver.get_expanded_nodes()  # Assuming this method exists
+        logger.info(f"CBS Expanded Nodes: {expanded_nodes}")
+        logger.info(f"Total Runtime: {runtime:.2f} seconds")
+        
         logger.info(f"Saving History results to {results_path}")
         save_history(history, results_path)
 
