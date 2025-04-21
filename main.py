@@ -42,7 +42,7 @@ def run_multiple_ur5e_scenario():
         # Second robot rotated 180 degrees around Z-axis (facing the first robot)
 
         robot1 = UR5eRobot(position=[0, 0, 0], orientation=[0, 0, 0, 1])
-        robot2 = UR5eRobot(position=[1, 0, 0], orientation=[0, 0, 1, 1])
+        robot2 = UR5eRobot(position=[1, 0.75, 0], orientation=[0, 0, 1, 1])
         robot3 = UR5eRobot(position=[1.1, -0.3, 0], orientation=[0, 0, 0.7071, 0.7071])
         # robot3 = UR5eRobot(position=[1.1, -0.3, 0], orientation=[0, 0, 0, 1])
 
