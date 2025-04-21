@@ -649,7 +649,7 @@ if __name__ == "__main__":
     urdf = "../assets/ur5e/ur5e.urdf"
     n_arms       = 2
     reach_radius = 0.85      # UR10e reach [m]
-    target_pct = 0.45      # target overlap fraction
+    target_pct = 0.55      # target overlap fraction
 
     # find the radius
     circle_rad = find_circle_radius_for_overlap(
