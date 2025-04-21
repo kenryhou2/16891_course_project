@@ -698,9 +698,9 @@ def compute_all_joint_positions(q, fk_solver, chain):
 
 if __name__ == "__main__":
     urdf = "../assets/ur5e/ur5e.urdf"
-    n_arms       = 4
+    n_arms       = 3
     reach_radius = 0.85      # UR10e reach [m]
-    target_pct = 0.25      # target overlap fraction
+    target_pct = 0.55      # target overlap fraction
 
     # find the radius
     circle_rad = find_circle_radius_for_overlap(
@@ -726,7 +726,7 @@ if __name__ == "__main__":
     print("Base positions:")
     # enumerate over bases, separating x, y, z with commas
     for i, base in enumerate(tc['bases']):
-        print(f"  Arm {i}: [{base[0]:.3f}, {base[1]:.3f}, {base[2]:.3f}]")
+        print(f"  Arm {i} Base Position: [{base[0]:.3f}, {base[1]:.3f}, {base[2]:.3f}]")
         #print orientation of the base
         
     print("Start / End joint configs:")
