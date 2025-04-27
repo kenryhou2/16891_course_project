@@ -277,97 +277,191 @@ def generate_test_case_equidistant(n_arms, urdf_path,
         'chain':       chain
     }
 
+# def visualize(urdf_path, bases, starts, ends, R):
+#     """
+#     bases:    list of [x,y,0] base positions, shape (n,3)
+#     starts:   list of n joint arrays (len = dof)
+#     ends:     list of n joint arrays
+#     R:        hemisphere radius (m)
+#     """
+#     # 1) Start the GUI
+#     p.connect(p.GUI)
+#     p.setAdditionalSearchPath(pybullet_data.getDataPath())
+#     p.resetSimulation()
+#     p.setGravity(0, 0, 0)
+#     p.loadURDF("plane.urdf")
 
-def visualize(urdf_path, bases, starts, ends, R):
+#     n = len(bases)
+#     dof = len(starts[0])
+
+#     # Draw 1 m axes at the origin of the very first base
+#     base0 = bases[0]
+#     p.addUserDebugLine(base0, [base0[0]+1, base0[1], base0[2]], [1,0,0], 2)  # X-axis
+#     p.addUserDebugLine(base0, [base0[0], base0[1]+1, base0[2]], [0,1,0], 2)  # Y-axis
+#     p.addUserDebugLine(base0, [base0[0], base0[1], base0[2]+1], [0,0,1], 2)  # Z-axis
+
+#     # 2) Load start & end instances for each arm
+#     start_ids = []
+#     end_ids   = []
+#     for i in range(n):
+#         base_pos = bases[i]
+#         sid = p.loadURDF(urdf_path, base_pos, [0,0,0,1], useFixedBase=True)
+#         eid = p.loadURDF(urdf_path, base_pos, [0,0,0,1], useFixedBase=True)
+#         start_ids.append(sid)
+#         end_ids.append(eid)
+
+#         # set joint states
+#         for j in range(dof):
+#             p.resetJointState(sid, j, starts[i][j])
+#             p.resetJointState(eid, j, ends[i][j])
+
+#         # zero out motors so poses stay fixed
+#         for uid in (sid, eid):
+#             for j in range(p.getNumJoints(uid)):
+#                 qi = p.getJointState(uid, j)[0]
+#                 p.setJointMotorControl2(
+#                     bodyIndex=uid,
+#                     jointIndex=j,
+#                     controlMode=p.POSITION_CONTROL,
+#                     targetPosition=qi,
+#                     positionGain=0.1,
+#                     velocityGain=1.0
+#                 )
+
+#         # apply transparency/color
+#         for link in range(-1, p.getNumJoints(sid)):
+#             p.changeVisualShape(sid, link, rgbaColor=[0, 0, 1, 0.3])
+#         for link in range(-1, p.getNumJoints(eid)):
+#             p.changeVisualShape(eid, link, rgbaColor=[1, 0, 0, 0.3])
+
+#     # 3) Draw a wire-frame hemisphere shell
+#     N_theta, N_phi = 20, 40
+#     # build a grid of local hemisphere vertices
+#     hemi = [[
+#         (
+#             R * np.sin(theta) * np.cos(phi),
+#             R * np.sin(theta) * np.sin(phi),
+#             R * np.cos(theta)
+#         )
+#         for phi in np.linspace(0, 2*np.pi, N_phi)
+#     ] for theta in np.linspace(0, np.pi/2, N_theta)]
+
+#     color = [0.8, 0.8, 0.0]  # yellow
+#     lw    = 1               # thin lines
+
+#     for base in bases:
+#         # latitude circles
+#         for ring in hemi:
+#             for idx in range(len(ring)):
+#                 a = (np.array(ring[idx]) + base).tolist()
+#                 b = (np.array(ring[(idx+1) % len(ring)]) + base).tolist()
+#                 p.addUserDebugLine(a, b, color, lineWidth=lw)
+#         # meridian lines
+#         for phi_idx in range(N_phi):
+#             for theta_idx in range(N_theta-1):
+#                 a = (np.array(hemi[theta_idx][phi_idx]) + base).tolist()
+#                 b = (np.array(hemi[theta_idx+1][phi_idx]) + base).tolist()
+#                 p.addUserDebugLine(a, b, color, lineWidth=lw)
+
+#     # 4) Keep GUI alive
+#     while p.isConnected():
+#         time.sleep(1.0)
+def visualize(
+    urdf_path,
+    bases,
+    starts,
+    ends,
+    R,
+    show_end=True,
+    show_hemisphere=False
+):
     """
-    bases:    list of [x,y,0] base positions, shape (n,3)
-    starts:   list of n joint arrays (len = dof)
-    ends:     list of n joint arrays
-    R:        hemisphere radius (m)
+    urdf_path      : path to the robot URDF
+    bases          : list of [x,y,0] base positions, shape (n,3)
+    starts, ends   : list of n joint–angle lists (len = dof)
+    R              : hemisphere radius (m)
+    show_end       : if False, the 'end' arm poses are not loaded or drawn
+    show_hemisphere: if False, the overlap hemispheres are not drawn
     """
-    # 1) start the GUI
+    # 1) Start PyBullet
     p.connect(p.GUI)
     p.setAdditionalSearchPath(pybullet_data.getDataPath())
     p.resetSimulation()
-    p.setGravity(0,0,0)
+    p.setGravity(0, 0, 0)
     p.loadURDF("plane.urdf")
-    
+
     n = len(bases)
     dof = len(starts[0])
 
-    # draw 1 m axes at the origin of the very first base
-    base0 = bases[0].tolist()
-    p.addUserDebugLine(base0, [base0[0]+1, base0[1], base0[2]], [1,0,0], 2)  # X‑axis (red)
-    p.addUserDebugLine(base0, [base0[0], base0[1]+1, base0[2]], [0,1,0], 2)  # Y‑axis (green)
-    p.addUserDebugLine(base0, [base0[0], base0[1], base0[2]+1], [0,0,1], 2)  # Z‑axis (blue)
+   
 
-    # 2) for each arm, load start & end instances
+    # 2) Load start (and optionally end) arms
     start_ids = []
     end_ids   = []
     for i in range(n):
-        base_pos = bases[i].tolist()
-        # load start “ghost” arm
-        sid = p.loadURDF(urdf_path,
-                         base_pos, [0,0,0,1],
-                         useFixedBase=True)
-        # load end pose arm
-        eid = p.loadURDF(urdf_path, 
-                         base_pos, [0,0,0,1],
-                         useFixedBase=True)
+        base_pos = bases[i]
+        sid = p.loadURDF(urdf_path, base_pos, [0,0,0,1], useFixedBase=True)
         start_ids.append(sid)
-        end_ids.append(eid)
-        
-        # set joint states
+
+        # set start joints
         for j in range(dof):
             p.resetJointState(sid, j, starts[i][j])
-            p.resetJointState(eid, j, ends[i][j])
+        # fix start pose
+        for j in range(dof):
+            qi = p.getJointState(sid, j)[0]
+            p.setJointMotorControl2(sid, j, p.POSITION_CONTROL,
+                                     targetPosition=qi,
+                                     positionGain=0.1,
+                                     velocityGain=1.0)
+        # color start
+        for link in range(-1, p.getNumJoints(sid)):
+            p.changeVisualShape(sid, link, rgbaColor=[0, 0, 1, 0.3])
 
-        for uid in start_ids + end_ids: # set motor movement to zero
-            for j in range(p.getNumJoints(uid)):
-                p.setJointMotorControl2(
-                    bodyIndex=uid,
-                    jointIndex=j,
-                    controlMode=p.POSITION_CONTROL,
-                    targetPosition=p.getJointState(uid, j)[0],
-                    positionGain=0.1,   # small but nonzero
-                    velocityGain=1.0
-                )
-        
-        # apply transparency/color
-        num_links = p.getNumJoints(sid)
-        for link in range(-1, num_links):
-            # start = semi‑transparent blue
-            p.changeVisualShape(sid, link,
-                                rgbaColor=[0, 0, 1, 0.3])
-            # end   = opaque red
-            p.changeVisualShape(eid, link,
-                                rgbaColor=[1, 0, 0, 0.3])
-    
-    # 3) shade each overlap hemisphere
-    #    sample points on a half‑sphere mesh
-    pts = []
-    N_theta, N_phi = 30, 30
-    for i in range(N_theta):
-        θ = (i / (N_theta-1)) * (np.pi/2)      # from 0→π/2
-        for j in range(N_phi):
-            φ = (j / (N_phi-1)) * (2*np.pi)
-            x =  R * np.sin(θ) * np.cos(φ)
-            y =  R * np.sin(θ) * np.sin(φ)
-            z =  R * np.cos(θ)
-            pts.append([x, y, z])
-    # for each base, draw its hemisphere
-    for base in bases:
-        trans_pts = np.array(pts) + base
-        colors    = [[0.8, 0.8, 0.0] for _ in trans_pts]  # yellow
-        p.addUserDebugPoints(trans_pts.tolist(),
-                             colors,
-                             pointSize=2)
-    
-    # 4) spin the GUI
+        if show_end:
+            eid = p.loadURDF(urdf_path, base_pos, [0,0,0,1], useFixedBase=True)
+            end_ids.append(eid)
+            for j in range(dof):
+                p.resetJointState(eid, j, ends[i][j])
+            for j in range(dof):
+                qi = p.getJointState(eid, j)[0]
+                p.setJointMotorControl2(eid, j, p.POSITION_CONTROL,
+                                         targetPosition=qi,
+                                         positionGain=0.1,
+                                         velocityGain=1.0)
+            for link in range(-1, p.getNumJoints(eid)):
+                p.changeVisualShape(eid, link, rgbaColor=[1, 0, 0, 0.3])
+
+    # 3) Optionally draw the wireframe hemisphere
+    if show_hemisphere:
+        N_theta, N_phi = 20, 40
+        hemi = [[
+            (
+                R * np.sin(theta) * np.cos(phi),
+                R * np.sin(theta) * np.sin(phi),
+                R * np.cos(theta)
+            )
+            for phi in np.linspace(0, 2*np.pi, N_phi)
+        ] for theta in np.linspace(0, np.pi/2, N_theta)]
+
+        color = [0.8, 0.8, 0.0]
+        lw    = 1
+        for base in bases:
+            # latitude circles
+            for ring in hemi:
+                for idx in range(len(ring)):
+                    a = (np.array(ring[idx]) + base).tolist()
+                    b = (np.array(ring[(idx+1)%len(ring)]) + base).tolist()
+                    p.addUserDebugLine(a, b, color, lineWidth=lw)
+            # meridians
+            for phi_idx in range(N_phi):
+                for theta_idx in range(N_theta-1):
+                    a = (np.array(hemi[theta_idx][phi_idx]) + base).tolist()
+                    b = (np.array(hemi[theta_idx+1][phi_idx]) + base).tolist()
+                    p.addUserDebugLine(a, b, color, lineWidth=lw)
+
+    # 4) Keep the GUI alive until the user closes it
     while p.isConnected():
-        # p.stepSimulation()
-        # time.sleep(1./240.)
-        time.sleep(1)
+        time.sleep(1.0)
 
 def print_joint_values(robot_ids, dof):
     """Query and print joint angles for each arm."""
@@ -698,9 +792,9 @@ def compute_all_joint_positions(q, fk_solver, chain):
 
 if __name__ == "__main__":
     urdf = "../assets/ur5e/ur5e.urdf"
-    n_arms       = 4
-    reach_radius = 0.85      # UR10e reach [m]
-    target_pct = 0.55      # target overlap fraction
+    n_arms       = 2
+    reach_radius = 1.1      # UR10e reach [m]
+    target_pct = 0.45      # target overlap fraction
 
     # find the radius
     circle_rad = find_circle_radius_for_overlap(
@@ -733,31 +827,22 @@ if __name__ == "__main__":
     for i,(q0,q1) in enumerate(zip(tc['starts'], tc['ends'])):
         z0 = fk_end_effector_z(q0, tc['fk_solver'])
         z1 = fk_end_effector_z(q1, tc['fk_solver'])
-        # print(f" Arm {i}: z_start={z0:.3f}, z_end={z1:.3f}, q_start={q0}, q_end={q1}")
-        # print(f" Arm {i}: q_start={q0}, q_end={q1}")
         start_joint_pos = compute_all_joint_positions(q0, tc['fk_solver'], tc['chain'])
         end_joint_pos = compute_all_joint_positions(q1, tc['fk_solver'], tc['chain'])
-        #print each joint labeled with their position
-        # print(f"Arm {i} start joint heights:")
-        # for j,(x,y,z) in enumerate(start_joint_pos):
-        #     print(f"  link {j}: z={z:.3f}")
-        # print(f"Arm {i} end joint heights:")
-        # for j,(x,y,z) in enumerate(end_joint_pos):
-        #     print(f"  link {j}: z={z:.3f}")
-    # print(f"starts: {tc['starts']}")
-    # print(f"ends:   {tc['ends']}")
-    starts = np.array(tc['starts'])
-    ends   = np.array(tc['ends'])
-    # visualize(urdf, tc['bases'], tc['starts'], tc['ends'], R=reach_radius)
-    # starts = [
-    #     [5.23284874, -1.58445506, -0.2418161,   5.93592047, -4.47959262,  1.70624056],
-    #     [0-0.07499926, -1.79615386,  0.75422246,  4.65247448 ,-6.15973073,  6.20933361],
-    # ]
-    # ends = [
-    #     [ -1.1754968,  -1.67706211 , 0.04952015 , 0.83344704, -2.39892561,  2.66351984],
-    #     [ -0.30105307, -1.23680399,  0.46000592, -2.48329919,  3.48096511,  2.76031482],
-    # ]
-    # visualize(urdf, tc['bases'], starts, ends, R=reach_radius)
-    visualize_interactive(urdf, tc['bases'], reach_radius)
-    # visualize_interactive(urdf, tc['bases'], starts, reach_radius)
+        
+    
+    starts = [
+        [0.0, -1.1243596076965332, -1.4550533294677734, 0.5621795654296875, 2.7116904258728027, -0.859804630279541], 
+        [0.0, 1.78574800491333, -1.5873312950134277, 1.2897064685821533, 1.5873308181762695, -0.7275266647338867], 
+        #  [0.0, -0.9259433746337891, -1.6534700393676758, 1.058220624923706, -0.5291104316711426, 1.7196087837219238] ,
+        #   [0.0, 4.695854663848877, -1.4550533294677734, -0.3968327045440674, -1.7196087837219238, 1.3889145851135254] 
+    ]
+    ends = [
+         [0.0, -3.836050033569336, -1.918025016784668, 1.2566368579864502, 3.3730788230895996, -4.166744232177734],
+          [0.0, 3.3069396018981934, 0.2645554542541504, -0.7936656475067139, 4.629716396331787, 0.19841623306274414] ,
+        #   [0.0, -2.976245641708374, -3.3730785846710205, 1.5542614459991455, 0.5291104316711426, -1.7196087837219238] ,
+        #   [0.0, 2.843967914581299, -0.3968329429626465, 0.6944572925567627, -2.843968152999878, 0.33069419860839844]  
+    ]
+    visualize(urdf, tc['bases'], starts, ends, R=reach_radius)
+    # visualize_interactive(urdf, tc['bases'], reach_radius)
     # visualize_interactive_dual(urdf, tc['bases'], starts, ends, reach_radius)
