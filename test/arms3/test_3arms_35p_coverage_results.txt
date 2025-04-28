@@ -1,0 +1,10 @@
+=== Results for ./test/arms3/test_3arms_35p_coverage.txt ===
+Arm 0  Config 1: SUCCESS (within tol 0.05)
+Arm 0  Config 2: SUCCESS (within tol 0.05)
+Arm 0  Config 3: SUCCESS (within tol 0.05)
+Arm 1  Config 1: SUCCESS (within tol 0.05)
+Arm 1  Config 2: SUCCESS (within tol 0.05)
+Arm 1  Config 3: SUCCESS (within tol 0.05)
+Arm 2  Config 1: SUCCESS (within tol 0.05)
+Arm 2  Config 2: SUCCESS (within tol 0.05)
+Arm 2  Config 3: SUCCESS (within tol 0.05)

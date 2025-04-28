@@ -1,0 +1,7 @@
+=== Results for ./test/arms2/test_2arms_45p_coverage.txt ===
+Arm 0  Config 1: SUCCESS (within tol 0.05)
+Arm 0  Config 2: SUCCESS (within tol 0.05)
+Arm 0  Config 3: SUCCESS (within tol 0.05)
+Arm 1  Config 1: SUCCESS (within tol 0.05)
+Arm 1  Config 2: SUCCESS (within tol 0.05)
+Arm 1  Config 3: SUCCESS (within tol 0.05)

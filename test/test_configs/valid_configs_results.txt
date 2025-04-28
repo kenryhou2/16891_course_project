@@ -1,0 +1,8 @@
+=== Results for ./test/test_configs/valid_configs.txt ===
+Arm 0  Config 1: SUCCESS (within tol 0.05)
+Arm 0  Config 2: SUCCESS (within tol 0.05)
+Arm 0  Config 3: SUCCESS (within tol 0.05)
+Arm 0  Config 4: SUCCESS (within tol 0.05)
+Arm 0  Config 5: SUCCESS (within tol 0.05)
+Arm 0  Config 6: SUCCESS (within tol 0.05)
+Arm 0  Config 7: SUCCESS (within tol 0.05)
