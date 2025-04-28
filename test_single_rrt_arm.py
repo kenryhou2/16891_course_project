@@ -73,35 +73,36 @@ def run_ur5e_scenario(start_config=None, end_config=None, base_pos = None,headle
     # Create simulator
     simulator = Simulator([robot], {robot.robot_id: controller}, environment=env)
 
-    # try:
-    # Run simulation
-    logger.info("Starting UR5e simulation")
+    try:
+        # Run simulation
+        logger.info("Starting UR5e simulation")
 
-    # DataVisualizer.visualize_ee_path(robot, path, env, duration=3, line_width=10)
+        # DataVisualizer.visualize_ee_path(robot, path, env, duration=3, line_width=10)
 
-    history = simulator.run(duration=30.0, dt=1 / 240)
-    logger.info("Ending UR5e simulation")
-    # Visualize results
-    # DataVisualizer.plot_joint_trajectories(history, "UR5e Robot Joint Trajectories")
+        history = simulator.run(duration=30.0, dt=1 / 240)
+        logger.info("Ending UR5e simulation")
+        # Visualize results
+        # DataVisualizer.plot_joint_trajectories(history, "UR5e Robot Joint Trajectories")
 
-    # Save results
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    results_path = os.path.join(os.path.dirname(__file__), ".", "data", "simulation_results", f"ur5e_sim_{(timestamp)}.json")
+        # Save results
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        results_path = os.path.join(os.path.dirname(__file__), ".", "data", "simulation_results", f"ur5e_sim_{(timestamp)}.json")
 
-    logger.info(f"Saving History results to {results_path}")
-    save_history(history, results_path)
+        logger.info(f"Saving History results to {results_path}")
+        save_history(history, results_path)
 
-    # except Exception as e:
-    #     logger.error(f"Simulation error: {str(e)}") 
+    except Exception as e:
+        logger.error(f"Simulation error: {str(e)}") 
 
-    # finally:
-    #     # Clean up
-    simulator.close()
+    finally:
+        # Clean up
+        simulator.close()
 
 
 if __name__ == "__main__":
     # start_config = [0, 0, 0, 0, 0, 0]
+    
     base_pos = [-0.481445312, 5.89600461e-17, 0.0]
-    start_config = [0.0, -1.884955644607544, -0.5952491760253906, 1.058220624923706, -1.025151252746582, 0.892874002456665]
-    end_config = [0.0, 0.0, -1.488122820854187, -0.7275266647338867, -1.421984076499939, 1.6204006671905518] 
+    start_config =  [0.0, -1.1904983520507812, -1.7196087837219238, -0.2976245880126953, -1.1904983520507812, 0.793665885925293]
+    end_config = [0.0, -0.9920816421508789, -1.918025016784668, -0.2645552158355713, 0.19841623306274414, 0.793665885925293]
     run_ur5e_scenario(start_config=start_config, end_config=end_config, base_pos=base_pos, headless=False)
