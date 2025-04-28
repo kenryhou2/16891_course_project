@@ -10,6 +10,8 @@ from typing import List, Dict, Optional, Tuple, Any
 from controller import Controller, JointPositionController, JointVelocityController, JointTorqueController, TrajectoryController
 from environment import SimulationEnvironment
 from robot_model import RobotModel
+import itertools
+import pybullet as p
 
 
 logger = logging.getLogger(__name__)
@@ -92,6 +94,16 @@ class Simulator:
 
                 # Step physics simulation
                 self.env.step(dt)
+
+                # Collision detection
+                robot_ids = [robot.robot_id for robot in self.robots]
+                for idA, idB in itertools.combinations(robot_ids, 2):
+                    contacts = p.getContactPoints(bodyA=idA, bodyB=idB)
+                    if contacts:
+                        logger.warning(f"[t={sim_time:.3f}] Collision detected between {idA} and {idB}")
+                        for c in contacts:
+                            linkA, linkB, pt = c[3], c[4], c[5]
+                            logger.warning(f"    link {linkA} ↔ link {linkB} at {pt}")
 
                 # Update simulation time
                 sim_time = time.time() - start_time
